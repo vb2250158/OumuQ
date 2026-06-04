@@ -49,7 +49,7 @@ class BatchRequest(BaseModel):
     max_new_tokens: int | None = None
 
 
-app = FastAPI(title="Local TTS Studio")
+app = FastAPI(title="OumuQ")
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
 
 

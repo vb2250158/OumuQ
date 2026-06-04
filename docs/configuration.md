@@ -9,7 +9,7 @@
 ## 启动项目
 
 ```powershell
-cd local-tts-studio
+cd OumuQ
 py -X utf8 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e .
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8780

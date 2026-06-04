@@ -1,6 +1,6 @@
 # Worker 契约
 
-Local TTS Studio 通过 HTTP 和模型 worker 通信。
+OumuQ 通过 HTTP 和模型 worker 通信。
 
 worker 契约采用角色优先设计。调用方最好只发送 `character_id` 和文本，由 worker 或路由层解析语言、引擎参数、参考音频、情绪提示和播放行为。
 

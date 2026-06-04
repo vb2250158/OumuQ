@@ -1,8 +1,8 @@
-# Local TTS Studio
+# OumuQ
 
 ![OumuQ README Banner](assets/branding/oumuq-readme-banner.png)
 
-Local TTS Studio 是一个**角色优先的本地 TTS 路由系统**。
+OumuQ 是一个**角色优先的本地 TTS 路由系统**。
 
 它不只是某个语音模型的 Web UI。它的核心目标是：先定义“谁在说话”，再根据角色配置自动选择语言、TTS 引擎、参考音频、情绪参数、生成队列和顺序播放策略。
 
@@ -20,7 +20,7 @@ Local TTS Studio 是一个**角色优先的本地 TTS 路由系统**。
 选择模型 -> 选择音色 -> 输入文本 -> 生成音频
 ```
 
-Local TTS Studio 从角色出发：
+OumuQ 从角色出发：
 
 ```text
 选择角色 -> 推断语言/模型/参考音/情绪 -> 提交文本 -> 异步生成 -> 按顺序播放
@@ -108,7 +108,7 @@ GUI 和 Agent 集成只需要对接统一的路由契约，而不是写死某一
 Web GUI / Agent / CLI
         |
         v
-Local TTS Studio 路由层
+OumuQ 路由层
         |
         +-- 读取 voice-references/reference-index.json
         +-- 解析角色/人格
@@ -144,7 +144,7 @@ Local TTS Studio 路由层
 ## 快速开始
 
 ```powershell
-cd local-tts-studio
+cd OumuQ
 py -X utf8 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e .
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8780

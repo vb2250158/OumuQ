@@ -1,5 +1,5 @@
 [project]
-name = "local-tts-studio"
+name = "oumuq"
 version = "0.1.0"
 description = "Local Web GUI and router for character TTS workers."
 readme = "README.md"
