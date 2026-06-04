@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "root": "voice-references",
+  "characters": [
+    {
+      "id": "jp_companion",
+      "name": "Japanese Companion",
+      "display_name_zh": "日语陪伴角色",
+      "character_folder": "voice-references/characters/jp_companion",
+      "index_file": "voice-references/characters/jp_companion/voice-index.json",
+      "fallback_prompt_audio": "voice-references/characters/jp_companion/audio/sample.mp3",
+      "tts_engine": "Qwen3-TTS",
+      "speech_language": "Japanese",
+      "visible_language": "Chinese",
+      "style_summary": "Playful but helpful assistant voice.",
+      "style_summary_zh": "活泼但可靠的日语陪伴语音。"
+    },
+    {
+      "id": "zh_reader",
+      "name": "Chinese Reader",
+      "display_name_zh": "中文朗读角色",
+      "character_folder": "voice-references/characters/zh_reader",
+      "index_file": "voice-references/characters/zh_reader/voice-index.json",
+      "fallback_prompt_audio": "voice-references/characters/zh_reader/audio/sample.mp3",
+      "tts_engine": "IndexTTS2",
+      "speech_language": "Chinese",
+      "visible_language": "Chinese",
+      "style_summary": "Warm and clear Chinese narration voice.",
+      "style_summary_zh": "温和清晰的中文朗读语音。"
+    }
+  ]
+}

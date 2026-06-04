@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>本地 TTS 工作台</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div class="brand">
+          <h1>本地 TTS 工作台</h1>
+          <p>角色优先的语音路由控制台</p>
+        </div>
+        <div class="status-strip">
+          <div class="status-chip" id="routerStatus">
+            <span>路由</span>
+            <strong>加载中</strong>
+          </div>
+          <div class="status-chip" id="workerStatus">
+            <span>工作进程</span>
+            <strong>未知</strong>
+          </div>
+          <button class="ghost-button" id="refresh">刷新</button>
+        </div>
+      </header>
+
+      <section class="app-grid">
+        <aside class="sidebar">
+          <section class="panel">
+            <div class="panel-title">
+              <h2>连接</h2>
+              <span id="registryBadge">注册表</span>
+            </div>
+            <label>
+              <span>工作进程地址</span>
+              <input id="workerUrl" spellcheck="false" />
+            </label>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title">
+              <h2>角色</h2>
+              <span id="characterCount">0</span>
+            </div>
+            <label>
+              <span>人格</span>
+              <select id="character"></select>
+            </label>
+            <div class="character-card" id="characterDetails"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title">
+              <h2>路由</h2>
+            </div>
+            <label>
+              <span>语音语言</span>
+              <input id="language" placeholder="Japanese" />
+            </label>
+            <label>
+              <span>最大 Token</span>
+              <input id="maxTokens" type="number" min="16" max="2048" value="192" />
+            </label>
+            <label class="toggle-row">
+              <input id="play" type="checkbox" checked />
+              <span>自动播放</span>
+            </label>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title">
+              <h2>情绪匹配</h2>
+            </div>
+            <label>
+              <span>标签</span>
+              <input id="emotionTags" placeholder="teasing, calm" />
+            </label>
+            <label>
+              <span>向量</span>
+              <input id="emotionVector" placeholder="0.2,0,0,0,0,0,0.1,0.1" />
+            </label>
+            <label>
+              <span>匹配规则</span>
+              <input id="matchPatterns" placeholder="senpai|greeting" />
+            </label>
+          </section>
+        </aside>
+
+        <section class="main-column">
+          <section class="compose-panel">
+            <div class="compose-head">
+              <div>
+                <h2>生成语音</h2>
+                <p id="activeRoute">未选择路由</p>
+              </div>
+              <div class="segmented" role="tablist" aria-label="输入模式">
+                <button class="segment is-active" id="singleMode" type="button">单句</button>
+                <button class="segment" id="batchMode" type="button">批量</button>
+              </div>
+            </div>
+
+            <div class="input-pane" id="singlePane">
+              <textarea id="text" rows="5" placeholder="输入要朗读的文本，按 Enter 发送，Shift+Enter 换行"></textarea>
+              <div class="action-row">
+                <span id="textMeta">0 字符</span>
+                <button id="send">生成并播放</button>
+              </div>
+            </div>
+
+            <div class="input-pane is-hidden" id="batchPane">
+              <textarea id="batchText" rows="10" placeholder="一行一句，提交后会按顺序进入队列"></textarea>
+              <div class="action-row">
+                <span id="batchMeta">0 行</span>
+                <button id="sendBatch">加入队列</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="runs-panel">
+            <div class="panel-title">
+              <h2>请求记录</h2>
+              <span id="runCount">0</span>
+            </div>
+            <div class="run-list" id="jobs"></div>
+          </section>
+        </section>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

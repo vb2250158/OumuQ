@@ -1,0 +1,43 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Local generation output and caches
+outputs/
+runs/
+*.log
+*.err.log
+*.wav
+*.mp3
+*.m4a
+*.flac
+.qwen-tts-cache*/
+.indextts2-audio-cache*/
+qwen-tts-output*/
+tts-worker-output*/
+tts-batch-output*/
+
+# Models and downloaded archives
+models/
+checkpoints/
+*.zip
+*.7z
+*.tar
+*.tar.gz
+
+# Keep reference metadata, but do not commit raw voice assets by default.
+voice-references/**/audio/*
+!voice-references/**/audio/.gitkeep
+voice-references.example/**/audio/*
+!voice-references.example/**/audio/.gitkeep
+
+# Local visual reference caches for mascot/design iteration.
+# The public repository should keep the README banner, not the bulky reference set.
+references/oumuq-character/
+assets/branding/*
+!assets/branding/
+!assets/branding/README.md
+!assets/branding/oumuq-readme-banner.png

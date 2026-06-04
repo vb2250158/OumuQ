@@ -1,0 +1,15 @@
+[
+  {
+    "id": "zh-reader-greeting",
+    "title": "Warm greeting",
+    "text": "Hello, I am here.",
+    "audio_file": "voice-references/characters/zh_reader/audio/sample.mp3",
+    "mood": "warm",
+    "emotion_tags": ["calm", "chat"],
+    "emotion_vector": [0.08, 0.0, 0.0, 0.0, 0.0, 0.0, 0.02, 0.28],
+    "emotion_alpha": 0.5,
+    "match_patterns": ["hello|test|explain"],
+    "style_notes": "Warm general-purpose narration reference."
+  }
+]
+

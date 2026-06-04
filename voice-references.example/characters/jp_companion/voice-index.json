@@ -1,0 +1,15 @@
+[
+  {
+    "id": "jp-companion-greeting",
+    "title": "Playful greeting",
+    "text": "Hello, senpai.",
+    "audio_file": "voice-references/characters/jp_companion/audio/sample.mp3",
+    "mood": "playful",
+    "emotion_tags": ["teasing", "cheerful"],
+    "emotion_vector": [0.22, 0.0, 0.0, 0.0, 0.0, 0.0, 0.08, 0.14],
+    "emotion_alpha": 0.5,
+    "match_patterns": ["hello|senpai|greeting"],
+    "style_notes": "Short, bright greeting reference."
+  }
+]
+
