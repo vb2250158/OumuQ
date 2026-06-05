@@ -17,6 +17,8 @@ POST /speak
 
 ## POST /speak
 
+`text` 是 TTS 实际要朗读的语音文本，不一定等于屏幕可见文本。Agent 对话模式应先准备语音文本和可见文本，提交语音文本，拿到 `queued` 后再显示可见文本。
+
 请求体示例：
 
 ```json
@@ -27,7 +29,14 @@ POST /speak
   "character_id": "jp_companion",
   "emotion_tags": ["cheerful", "gentle"],
   "emotion_vector": [0.22, 0, 0, 0, 0, 0, 0.08, 0.14],
+  "emotion_mode": "vector",
+  "emotion_alpha": 0.5,
+  "emotion_text": "bright and gentle",
+  "ref_text": "晚上好，今天辛苦了。",
   "match_patterns": ["晚上好|辛苦了"],
+  "prompt_audio": "voice-references/characters/jp_companion/audio/sample.wav",
+  "instructions": "Use a warm conversational delivery.",
+  "send_instructions": false,
   "max_new_tokens": 192
 }
 ```
@@ -45,6 +54,8 @@ worker 应尽快返回任务对象：
 
 生成和播放应在 worker 进程里异步继续执行。
 
+如果 worker 收到的是角色对话请求，调用方负责保证传入的 `text` 已经符合 `speech_language` 和角色语气。worker 可以记录 `character_id`、`language` 和解析后的路由信息，但不应把普通助手文本自动改写成角色文本，除非它显式实现了安全的文本改写层。
+
 ## 角色感知字段
 
 - `character_id`：推荐使用的高层角色选择器。
@@ -52,11 +63,54 @@ worker 应尽快返回任务对象：
 - `language`：语音输出语言，通常来自角色配置。
 - `emotion_tags`：人类可读的情绪提示。
 - `emotion_vector`：数值情绪控制，也可用于参考音频匹配。
+- `emotion_mode`：worker 对情绪字段的解释模式，例如 `tags`、`vector` 或 `text`。
+- `emotion_alpha`：情绪控制强度，通常是 0 到 1 的浮点数。
+- `emotion_text`：自然语言情绪描述，适合支持文本情绪提示的 worker。
 - `match_patterns`：请求侧正则或关键词提示。
+- `ref_text`：参考音频对应的文本，适合需要显式 prompt text 的 worker。
 - `prompt_audio`：显式指定单条参考音频。
 - `prompt_audios`：显式指定多条参考音频。
+- `instructions`：provider 侧发声说明，适合已验证支持该字段的 API worker。
+- `send_instructions`：是否把 `instructions` 发送给 provider；未验证时建议为 `false`。
 
 正常对话优先使用 `character_id`。显式参考音频路径更适合调试、测试和手动配音生产。
+
+## 云端 API worker
+
+云端 worker 应保持和本地 worker 一样的路由接口。调用方优先传 `character_id`，由 worker 从本地 `voice-references/reference-index.json` 读取云端字段：
+
+```json
+{
+  "id": "cloud_zh_voice",
+  "tts_engine": "Qwen-TTS-API",
+  "api_voice_id": "<set-in-local-copy>",
+  "api_clone_audio_url": "<public-or-signed-reference-audio-url>",
+  "api_clone_target_model": "cosyvoice-v3-plus",
+  "send_instructions_by_default": false
+}
+```
+
+公开仓库只能保留占位符。真实 `voice_id`、克隆 URL、API key 和服务器地址应放在本地私有配置、环境变量或部署密钥中。
+
+## POST /api/infer-parameters
+
+这是 OumuQ 路由层的辅助接口，不是 worker 必需接口。它用于在提交 `/api/speak` 或 `/api/batch` 前，根据文本和角色推理参数。
+
+```json
+{
+  "text": "晚上好，今天辛苦了。",
+  "character_id": "jp_companion",
+  "provider": "auto"
+}
+```
+
+`provider` 可选：
+
+- `auto`：如果配置了 LLM 就用 LLM，否则用本地启发式。
+- `heuristic`：只用本地启发式。
+- `llm`：强制使用 OpenAI-compatible LLM。
+
+接口只返回参数，不会触发语音生成或播放。
 
 ## 输出组织
 

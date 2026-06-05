@@ -15,10 +15,15 @@ runs/
 *.m4a
 *.flac
 .qwen-tts-cache*/
+.qwen-tts-api-cache*/
 .indextts2-audio-cache*/
 qwen-tts-output*/
+qwen-tts-api-output*/
 tts-worker-output*/
 tts-batch-output*/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
 
 # Models and downloaded archives
 models/

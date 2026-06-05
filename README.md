@@ -86,7 +86,7 @@ OumuQ 从角色出发：
 
 - 日语或多语言角色：Qwen3-TTS
 - 中文克隆向角色：IndexTTS2
-- 后续云端语音：API provider
+- 云端克隆语音：Qwen-TTS-API 或其他 API provider
 
 GUI 和 Agent 集成只需要对接统一的路由契约，而不是写死某一个模型。
 
@@ -127,6 +127,7 @@ OumuQ 路由层
 
 - Qwen3-TTS：日语和多语言音色克隆。
 - IndexTTS2：中文和本地克隆向语音。
+- Qwen-TTS-API：通过兼容 worker 对接云端 API 音色和已脱敏的克隆配置。
 
 项目不包含模型权重、生成音频、版权游戏音频或个人参考音频。
 
@@ -135,13 +136,16 @@ OumuQ 路由层
 - 基于 `voice-references/reference-index.json` 的角色选择。
 - Web GUI：输入单句并按回车播放。
 - 批量输入：粘贴多行快速入队。
-- Worker URL 选择：支持 Qwen、IndexTTS2 和后续 API worker。
+- Worker URL 选择：支持 Qwen、IndexTTS2、Qwen-TTS-API 和后续 API worker。
 - 可选 `emotion_tags`、`emotion_vector`、`match_patterns`。
 - 请求日志按 `runs/YYYY-MM-DD/HHMMSS-...` 组织。
 - worker 状态轮询和最近请求列表。
 - 共用参考音频匹配模块：`app/core/voice_reference.py`。
+- 公开版 Agent skill 模板：`skills/`。
 
 ## 快速开始
+
+安装 Web GUI：
 
 ```powershell
 cd OumuQ
@@ -161,6 +165,14 @@ http://127.0.0.1:8780
 ```text
 http://127.0.0.1:8765
 ```
+
+如果要把 OumuQ 的角色对话工作流安装到 Codex，运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\install_codex_skills.ps1 -Force
+```
+
+安装后重启 Codex 或打开新会话。完整说明见 [codex-skill-install.md](docs/codex-skill-install.md)。
 
 ## 参考音色
 
@@ -183,6 +195,16 @@ voice-references/
 ```
 
 更多说明见 [voice-references.md](docs/voice-references.md)。
+
+## Agent 与绘画模式
+
+OumuQ 可以作为 Agent 对话语音层：Agent 先写出“屏幕可见文本”和“语音文本”，把语音文本提交给常驻 worker，拿到 queued 状态后再显示屏幕文本。
+
+屏幕文本也是角色扮演的一部分，不能退回普通助手腔。比如语音用日语、屏幕用中文时，中文应翻译日语含义并保留同一角色的语气、称呼、温度和安全边界。
+
+绘画模式也可以复用同一个 `character_id`，但只读取已脱敏的 `visual_profile` 字段。
+
+流程说明见 [agent-workflows.md](docs/agent-workflows.md)，公开 skill 模板见 [skills/README.md](skills/README.md)。
 
 ## 开源注意事项
 
