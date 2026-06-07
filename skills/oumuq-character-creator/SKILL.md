@@ -1,33 +1,33 @@
 ---
 name: oumuq-character-creator
-description: Create or update OumuQ character entries in voice-references, including character folders, README.md, voice-index.json, reference-index.json records, local/private voice fields, cloud clone placeholders, worker routing, language settings, and public-safe visual_profile metadata. Use when the user asks to create/add/register/scaffold a new OumuQ role, character, voice character, persona, voice-reference entry, or dialogue-mode character.
+description: 创建或更新 OumuQ 的 voice-references 角色条目，包括角色文件夹、README.md、voice-index.json、reference-index.json 记录、本地/私有声线字段、云端克隆占位符、worker 路由、语言设置和公开安全的 visual_profile 元数据。当用户要求创建、添加、注册、脚手架化新的 OumuQ 角色、语音角色、人格、voice-reference 条目或对话模式角色时使用。
 ---
 
-# OumuQ Character Creator
+# OumuQ 角色创建器
 
-Use this skill to create or update a character in an OumuQ workspace.
+使用这个 skill 在 OumuQ workspace 中创建或更新角色。
 
-The goal is to produce a usable `voice-references` character entry without leaking private voice data into the public repository.
+目标是产出可用的 `voice-references` 角色条目，同时避免把私有声线数据泄露进公开仓库。
 
-## Inputs
+## 输入
 
-Collect or infer:
+收集或推断：
 
-- `character_id`: stable lowercase id such as `cloud_zh_voice` or `jp_companion`.
-- Display names: `name`, `display_name`, and/or `display_name_zh`.
-- `tts_engine`: usually `Qwen-TTS-API`, `Qwen3-TTS`, or `IndexTTS2`.
-- `speech_language`: language spoken by TTS.
-- `visible_language`: language shown to the user.
-- Character style: concise personality, tone, address terms, and dialogue boundaries.
-- Worker URL: use the OumuQ conventions unless the user provides another local URL.
-- Voice source state: local reference audio, existing cloud `api_voice_id`, pending clone URL, or placeholder only.
-- Public/private target: whether the edit is for the public repo example or the user's local private `voice-references`.
+- `character_id`：稳定的小写 id，例如 `cloud_zh_voice` 或 `jp_companion`。
+- 显示名称：`name`、`display_name` 和/或 `display_name_zh`。
+- `tts_engine`：通常是 `Qwen-TTS-API`、`Qwen3-TTS` 或 `IndexTTS2`。
+- `speech_language`：TTS 实际说出的语言。
+- `visible_language`：展示给用户看的语言。
+- 角色风格：简洁的人格、语气、称呼方式和对话边界。
+- Worker URL：除非用户提供其他本地 URL，否则使用 OumuQ 约定。
+- 声线来源状态：本地参考音频、已有云端 `api_voice_id`、待克隆 URL，或仅占位符。
+- 公开/私有目标：本次编辑是给公开仓库示例，还是给用户本地私有 `voice-references`。
 
-If the user gives only a character concept, choose conservative defaults and create placeholders. Do not ask for secrets.
+如果用户只给出角色概念，选择保守默认值并创建占位符。不要索要密钥。
 
-## File Targets
+## 文件目标
 
-Use the local workspace paths:
+使用本地 workspace 路径：
 
 ```text
 voice-references/reference-index.json
@@ -36,27 +36,27 @@ voice-references/characters/<character_id>/voice-index.json
 voice-references/characters/<character_id>/audio/.gitkeep
 ```
 
-If `voice-references` does not exist but `voice-references.example` does, ask whether the user wants a private local copy. For public templates, edit `voice-references.example`.
+如果 `voice-references` 不存在但 `voice-references.example` 存在，询问用户是否需要一份私有本地副本。公开模板只编辑 `voice-references.example`。
 
-Keep generated audio, cache files, worker logs, and clone samples out of `voice-references` unless the user explicitly provides authorized reference audio for a private local copy.
+除非用户明确为私有本地副本提供了授权参考音频，否则不要把生成音频、缓存文件、worker 日志或 clone samples 放进 `voice-references`。
 
-## Workflow
+## 工作流
 
-1. Inspect existing `voice-references/reference-index.json` or `voice-references.example/reference-index.json`.
-2. Ensure `character_id` is unique. If an entry exists, update it instead of duplicating it.
-3. Create the character folder and `audio/.gitkeep`.
-4. Write `README.md` as the primary style guide for dialogue mode.
-5. Write `voice-index.json` with public metadata or local authorized reference metadata.
-6. Update `reference-index.json` by parsing JSON, editing the `characters` array, and preserving valid JSON.
-7. Run a JSON parser check on all edited JSON files.
-8. If OumuQ is running, verify `GET /api/characters` can see the character after restart or refresh when applicable.
-9. Install updated skills only if the skill itself changed; creating a character does not require reinstalling skills.
+1. 检查现有 `voice-references/reference-index.json` 或 `voice-references.example/reference-index.json`。
+2. 确保 `character_id` 唯一。如果条目已存在，更新它，不要重复创建。
+3. 创建角色文件夹和 `audio/.gitkeep`。
+4. 编写 `README.md`，作为对话模式的主要风格指南。
+5. 编写 `voice-index.json`，包含公开元数据或本地授权参考元数据。
+6. 通过 JSON 解析编辑 `reference-index.json` 的 `characters` 数组，并保持合法 JSON。
+7. 对所有改过的 JSON 文件运行解析检查。
+8. 如果 OumuQ 正在运行，在适用时重启或刷新后验证 `GET /api/characters` 能看到该角色。
+9. 只有 skill 本身发生变化时才安装更新后的 skills；创建角色不需要重新安装 skills。
 
-Use structured JSON parsing instead of regex edits for `reference-index.json`.
+编辑 `reference-index.json` 时使用结构化 JSON 解析，不要用正则替换。
 
-## Reference Entry Shape
+## 参考条目形状
 
-Base character entry:
+基础角色条目：
 
 ```json
 {
@@ -76,16 +76,16 @@ Base character entry:
 }
 ```
 
-Recommended worker URLs:
+推荐 worker URL：
 
-- `Qwen3-TTS`: `http://127.0.0.1:8765`
-- `IndexTTS2`: `http://127.0.0.1:8766`
-- `Qwen-TTS-API`: `http://127.0.0.1:8767`
-- OumuQ route layer: `http://127.0.0.1:8780`
+- `Qwen3-TTS`：`http://127.0.0.1:8765`
+- `IndexTTS2`：`http://127.0.0.1:8766`
+- `Qwen-TTS-API`：`http://127.0.0.1:8767`
+- OumuQ 路由层：`http://127.0.0.1:8780`
 
-## Cloud API Characters
+## 云端 API 角色
 
-For `tts_engine = "Qwen-TTS-API"`, add public-safe cloud fields:
+对于 `tts_engine = "Qwen-TTS-API"`，添加公开安全的云端字段：
 
 ```json
 {
@@ -98,13 +98,13 @@ For `tts_engine = "Qwen-TTS-API"`, add public-safe cloud fields:
 }
 ```
 
-In a private local copy, real `api_voice_id` and clone URLs may be stored if the user has chosen to keep them there. In a public repo, keep placeholders.
+在私有本地副本中，如果用户选择保存在那里，可以存放真实 `api_voice_id` 和 clone URL。公开仓库里必须保留占位符。
 
-For CosyVoice clone samples, prefer 15-20 seconds and a provider-accessible URL. A local path such as `<local-reference-audio-path>` is not enough for cloud enrollment.
+CosyVoice 克隆样本优先使用 15-20 秒，并且需要 provider 可访问的 URL。像 `<local-reference-audio-path>` 这样的本地路径不足以完成云端注册。
 
-## Local Reference Audio Characters
+## 本地参考音频角色
 
-For `IndexTTS2` or `Qwen3-TTS`, use local authorized reference audio:
+对于 `IndexTTS2` 或 `Qwen3-TTS`，使用本地授权参考音频：
 
 ```json
 [
@@ -122,25 +122,25 @@ For `IndexTTS2` or `Qwen3-TTS`, use local authorized reference audio:
 ]
 ```
 
-If no audio is available yet, create `voice-index.json` as an empty array or with metadata-only examples that omit `audio_file`. Do not invent file paths to audio that does not exist unless the entry is clearly a placeholder.
+如果暂时没有音频，创建空数组形式的 `voice-index.json`，或创建不含 `audio_file` 的 metadata-only 示例。不要编造不存在的音频路径，除非该条目明确是占位符。
 
-## Character README
+## 角色 README
 
-Keep `README.md` concise and useful for dialogue mode:
+让 `README.md` 简洁，并对对话模式有用：
 
-- Character purpose and public/private note.
-- Speaking style and emotional range.
-- Address terms and recurring phrasing, if safe.
-- `speech_language` and `visible_language`.
-- TTS engine and worker expectation.
-- Voice/reference status.
-- Safety boundaries: what not to imitate, reveal, or publish.
+- 角色用途和公开/私有说明。
+- 说话风格和情绪范围。
+- 安全时可写称呼方式和常用表达。
+- `speech_language` 和 `visible_language`。
+- TTS engine 和 worker 预期。
+- 声线/参考音频状态。
+- 安全边界：不要模仿、泄露或发布什么。
 
-Do not include real speaker identity, private character names, copyrighted character provenance, API keys, cookies, tokens, private server URLs, or unapproved reference links.
+不要包含真实说话人身份、私有角色名、受版权保护的角色来源、API key、cookie、token、私有服务器 URL 或未授权参考链接。
 
 ## Visual Profile
 
-If the user wants drawing mode too, add only public-safe visual fields:
+如果用户也需要绘图模式，只添加公开安全的 visual 字段：
 
 ```json
 {
@@ -152,36 +152,36 @@ If the user wants drawing mode too, add only public-safe visual fields:
 }
 ```
 
-Do not turn voice provenance into visual identity.
+不要把声线来源转换成视觉身份。
 
-## Public Safety
+## 公开安全
 
-Public OumuQ examples may contain:
+公开 OumuQ 示例可以包含：
 
-- Generic character ids.
-- Placeholder cloud fields.
-- Public-safe style summaries.
-- Metadata-only voice-index examples.
-- `.gitkeep` in `audio/`.
+- 通用角色 id。
+- 云端字段占位符。
+- 公开安全的风格摘要。
+- Metadata-only 的 voice-index 示例。
+- `audio/` 里的 `.gitkeep`。
 
-Public OumuQ examples must not contain:
+公开 OumuQ 示例不能包含：
 
-- Real `api_voice_id`, API keys, cookies, or tokens.
-- Real clone URLs or signed object-storage links.
-- Personal machine paths.
-- Private character names or private address terms.
-- Unlicensed third-party audio, generated output audio, worker caches, or logs.
-- Private visual references or prompts that reveal protected identity.
+- 真实 `api_voice_id`、API key、cookie 或 token。
+- 真实 clone URL 或签名对象存储链接。
+- 个人机器路径。
+- 私有角色名或私有称呼方式。
+- 未授权第三方音频、生成输出音频、worker 缓存或日志。
+- 会暴露受保护身份的私有视觉参考或提示词。
 
-## Validation
+## 验证
 
-After editing:
+编辑后：
 
 ```powershell
 Get-Content -Raw -Encoding utf8 voice-references\reference-index.json | ConvertFrom-Json | Out-Null
 Get-Content -Raw -Encoding utf8 voice-references\characters\<character_id>\voice-index.json | ConvertFrom-Json | Out-Null
 ```
 
-For public examples, run the same checks against `voice-references.example`.
+公开示例要对 `voice-references.example` 运行同样检查。
 
-If tests exist, run the focused OumuQ checks that cover character loading or route configuration.
+如果存在测试，运行覆盖角色加载或路由配置的聚焦 OumuQ 检查。

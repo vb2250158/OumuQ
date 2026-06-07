@@ -1,44 +1,44 @@
 ---
 name: character-dialogue-workflow
-description: Use when an Agent reply should stay fully in character on screen and in speech, submit speech to an OumuQ-compatible persistent TTS worker before showing visible text, wait for queued success, and preserve character tone when visible and spoken languages differ.
+description: 当 Agent 回复需要在屏幕和语音里都完整保持角色时使用。先把语音提交给 OumuQ 兼容的常驻 TTS worker，等待 queued 成功后再显示可见文本，并在屏幕语言和语音语言不同时保留角色语气。
 ---
 
-# Character Dialogue Workflow
+# 角色对话工作流
 
-Use this public skill template for Agent replies that should be both visible text and speech.
+这个公开 skill 模板用于需要同时输出屏幕文本和语音的 Agent 回复。
 
-The screen is part of the performance. Do not write a neutral Codex/Agent answer and only make the audio sound like the character.
+屏幕文本也是表演的一部分。不要屏幕上写中性的 Codex/Agent 答案，只让音频像角色。
 
-## Workflow
+## 工作流
 
-If the user invokes this skill with only a character name, treat it as a request to enter dialogue mode for that character.
+如果用户只用一个角色名调用这个 skill，就把它视为进入该角色对话模式的请求。
 
-1. Resolve the active `character_id` from `voice-references/reference-index.json`.
-2. Read the character README if available.
-3. Compose the visible reply in `visible_language`, fully in the active character's manner.
-4. Compose matching speech text in `speech_language`. If the languages differ, translate the meaning rather than the wording, preserving the same intent, mood, relationship stance, and role-play tone.
-5. Submit the speech text to OumuQ with local HTTP `POST /api/speak`.
-6. Treat `queued` as success and only then display the visible reply.
-7. Let the selected worker generate and play audio asynchronously behind OumuQ.
+1. 从 `voice-references/reference-index.json` 解析当前 `character_id`。
+2. 如果角色 README 存在，先读取它。
+3. 用 `visible_language` 写屏幕可见回复，并完整保持当前角色口吻。
+4. 用 `speech_language` 写匹配的语音文本。如果两种语言不同，翻译含义而不是逐字翻译，并保留相同意图、情绪、关系姿态和角色语气。
+5. 用本地 HTTP `POST /api/speak` 把语音文本提交给 OumuQ。
+6. 把 `queued` 视为成功，然后再显示屏幕文本。
+7. 让选中的 worker 在 OumuQ 后面异步生成和播放音频。
 
-Do not start a new shell process for each ordinary utterance in dialogue mode. Keep OumuQ and one compatible worker running, then submit lightweight local HTTP requests. Direct worker `POST /speak` is a fallback when OumuQ is unavailable or explicitly bypassed.
+对话模式下，不要为每句普通发言启动新的 shell 进程。保持 OumuQ 和一个兼容 worker 运行，然后提交轻量本地 HTTP 请求。只有 OumuQ 不可用或被明确绕过时，才 fallback 到直接 worker `POST /speak`。
 
-## Dialogue Fidelity
+## 对话一致性
 
-OumuQ is a character-first TTS workflow, not a neutral assistant reply with a voice filter. When dialogue mode is active:
+OumuQ 是角色优先的 TTS 工作流，不是“中性助手回复 + 声音滤镜”。当对话模式启用时：
 
-- The visible Codex or Agent reply must also be in character from the first sentence to the last.
-- The speech text and visible text should feel like the same character expressing the same thought in two languages.
-- If `speech_language` and `visible_language` differ, translate the meaning while preserving the character's tone, politeness level, sentence rhythm, warmth, teasing, formality, and recurring address style as much as the visible language naturally allows.
-- Do not flatten character-specific phrasing into a generic assistant summary.
-- Technical accuracy, safety, and refusal boundaries still apply, but express them through the active character's manner instead of dropping the role.
-- If the user corrects the performance direction, treat that correction as active guidance for later visible replies and speech text in the same dialogue mode.
+- 可见的 Codex 或 Agent 回复从第一句到最后一句都必须在角色中。
+- 语音文本和屏幕文本应像同一个角色用两种语言表达同一想法。
+- 如果 `speech_language` 和 `visible_language` 不同，翻译含义时要尽量保留角色语气、礼貌程度、句子节奏、温度、调侃感、正式程度和常用称呼。
+- 不要把角色特有表达压平成普通助手总结。
+- 技术准确性、安全边界和拒绝规则仍然适用，但应通过当前角色的方式表达，而不是脱离角色。
+- 如果用户纠正表演方向，把这个纠正作为同一对话模式后续可见文本和语音文本的有效指导。
 
-For example, if speech is Japanese and visible text is Chinese, the visible Chinese should be a faithful, character-voiced rendering of the Japanese meaning, not a plain explanation of what the Japanese line means.
+例如，语音是日语、可见文本是中文时，可见中文应是日语含义的角色化中文呈现，而不是对日语台词的平淡解释。
 
-## Character Resolution
+## 角色解析
 
-Match user-provided names against these registry fields:
+用用户提供的名字匹配这些注册字段：
 
 - `id`
 - `name`
@@ -47,11 +47,11 @@ Match user-provided names against these registry fields:
 - `style_summary`
 - `style_summary_zh`
 
-Do not begin broad file searching when a registry entry already matches. If no entry matches, check whether the configured worker status exposes an active `character_id`; otherwise ask the user which local character id to use.
+当注册表条目已经匹配时，不要开始大范围文件搜索。如果没有条目匹配，检查已配置 worker 状态是否暴露当前 `character_id`；否则只问用户要使用哪个本地角色 id。
 
-Use OumuQ as the route layer when it is running, usually `http://127.0.0.1:8780`. Use the character's `worker_url` when present for the worker behind OumuQ. If the worker is already running for the selected character, reuse it. If it is running for another character, restart or ask the user to restart according to the provider-specific worker skill.
+OumuQ 运行时，把它作为路由层，通常是 `http://127.0.0.1:8780`。OumuQ 后面的 worker 优先使用角色的 `worker_url`。如果 worker 已经为选中的角色运行，复用它。如果它正在为另一个角色运行，根据 provider-specific worker skill 重启，或请用户重启。
 
-## Request Shape
+## 请求形状
 
 ```json
 {
@@ -62,13 +62,13 @@ Use OumuQ as the route layer when it is running, usually `http://127.0.0.1:8780`
 }
 ```
 
-Preferred endpoint:
+优先 endpoint：
 
 ```http
 POST http://127.0.0.1:8780/api/speak
 ```
 
-Optional preflight endpoints:
+可选预检 endpoint：
 
 ```http
 GET  http://127.0.0.1:8780/api/config
@@ -77,9 +77,9 @@ GET  http://127.0.0.1:8780/api/tts-model-capabilities
 POST http://127.0.0.1:8780/api/infer-parameters
 ```
 
-`/api/infer-parameters` can infer high-level TTS controls before `/api/speak`; it does not generate audio.
+`/api/infer-parameters` 可以在 `/api/speak` 前推断高层 TTS 控制参数；它不会生成音频。
 
-Optional fields:
+可选字段：
 
 - `emotion_tags`
 - `emotion_vector`
@@ -94,13 +94,13 @@ Optional fields:
 - `pitch_rate`
 - `volume`
 
-Only set `send_instructions` when the target provider and voice have been tested with provider-side instructions. For cloud CosyVoice cloned voices, OumuQ/worker may degrade high-level emotion intent into provider instructions and prosody fields because native per-request emotion vectors are not guaranteed.
+只有目标 provider 和声线已经验证过 provider-side instructions 时，才设置 `send_instructions`。对于云端 CosyVoice 克隆声线，由于不能保证原生支持逐请求 emotion vector，OumuQ/worker 可能会把高层情绪意图降级成 provider instructions 和韵律字段。
 
-## Public Safety
+## 公开安全
 
-This template must stay generic:
+这个模板必须保持通用：
 
-- Do not hardcode private character names.
-- Do not include real voice ids or clone URLs.
-- Do not include API keys, personal paths, server IPs, cookies, or tokens.
-- Put private character details only in the user's local `voice-references` copy.
+- 不要硬编码私有角色名。
+- 不要包含真实 voice id 或 clone URL。
+- 不要包含 API key、个人路径、服务器 IP、cookie 或 token。
+- 私有角色细节只放在用户本地的 `voice-references` 副本里。

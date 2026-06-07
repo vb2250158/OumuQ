@@ -1,7 +1,7 @@
 interface:
-  display_name: "Character TTS Dialogue"
-  short_description: "Role-play Codex replies in a character style and speak them with TTS."
-  default_prompt: "Use $character-tts-dialogue so every visible Codex output follows the active character style and is submitted to TTS before display."
+  display_name: "角色 TTS 对话"
+  short_description: "让 Codex 回复保持角色风格，并通过 TTS 播放。"
+  default_prompt: "使用 $character-tts-dialogue，让每段可见 Codex 输出都遵循当前角色风格，并在显示前提交给 TTS。"
 
 policy:
   allow_implicit_invocation: true

@@ -1,27 +1,29 @@
-﻿---
+---
 name: character-tts-dialogue
-description: Use when the user wants Codex chat replies to be both role-played in a selected character style and spoken through TTS. Handles every visible Codex output, character persona/style selection from voice-references, submitting speech to tts-router before displaying text, differing speech/visible languages, emotion hints when supported, workspace-owned cache/output, and UTF-8 Chinese paths.
+description: 当用户希望 Codex 聊天回复既保持选定角色风格、又通过 TTS 播放时使用。覆盖所有可见 Codex 输出、从 voice-references 选择角色人格/风格、先提交语音再显示文本、语音语言和屏幕语言不同的情况、支持时的情绪提示、工作区归属的缓存/输出，以及 UTF-8 中文路径。
 ---
 
-# Character TTS Dialogue
+# 角色 TTS 对话
 
-Use this skill when the user wants Codex replies to be spoken and lightly role-played as an active voice character.
+当用户希望 Codex 回复以当前语音角色轻度扮演，并且被朗读出来时，使用这个 skill。
 
-## Required Audio Workflow
+## 必需音频流程
 
-All dialogue audio generation must use the low-latency OumuQ workflow:
+所有对话音频生成都必须使用低延迟 OumuQ 工作流：
 
-1. Keep OumuQ running as the local route layer, usually `http://127.0.0.1:8780`.
-2. Keep one compatible TTS worker running for the active voice behind OumuQ.
-3. Submit each utterance through a local HTTP request to OumuQ `POST /api/speak`, preferably with Node REPL `fetch`.
-4. Confirm OumuQ returns an accepted job, usually `202 queued` or a JSON object whose `status` is `queued`, then immediately show the visible reply.
-5. Let generation and playback continue asynchronously in the worker.
-6. Only submit directly to the worker `POST /speak` when OumuQ is unavailable or the user explicitly wants to bypass the route layer.
-7. Do not launch a fresh PowerShell/Python command for each ordinary reply unless the persistent workflow is unavailable and the user accepts a fallback.
+1. 保持 OumuQ 作为本地路由层运行，通常是 `http://127.0.0.1:8780`。
+2. 保持一个兼容当前角色声线的 TTS worker 在 OumuQ 后面运行。
+3. 每次发言都通过本地 HTTP 请求提交给 OumuQ `POST /api/speak`，优先使用 Node REPL `fetch`。
+4. 确认 OumuQ 接受任务，通常是 `202 queued`，或返回 JSON 且 `status` 为 `queued`，然后立刻显示屏幕文本。
+5. 让 worker 在后台异步继续生成和播放。
+6. 只有在 OumuQ 不可用，或用户明确要求绕过路由层时，才直接提交给 worker `POST /speak`。
+7. 普通回复不要每次都启动新的 PowerShell/Python 命令；除非常驻流程不可用，且用户接受 fallback。
 
-For Qwen API dialogue mode, OumuQ usually runs on `http://127.0.0.1:8780` and forwards to `qwen-tts-api` on the character's `worker_url`, commonly `http://127.0.0.1:8767`. The worker may be started with `--character-id <character_id>` and loads the cloned CosyVoice `api_voice_id`, `api_clone_target_model`, `speech_language`, `visible_language`, `api_clone_language_hint`, `api_voice_instructions`, and `send_instructions_by_default` from `voice-references/reference-index.json`. Do not assume a fixed character; resolve the user-requested character from the registry and confirm OumuQ/worker status.
+延迟规则：直接 HTTP 不是零延迟。它仍然要等待本地请求处理、OumuQ 路由、worker 排队、音频生成和播放。使用持久 runtime，例如 Node REPL `fetch` 调用 `POST http://127.0.0.1:8780/api/speak`，目的在于去掉可避免的 shell 启动开销。普通逐句语音不要把 PowerShell、`curl`、Python one-shot 或其他新 shell 进程当作常规路径。
 
-This skill routes through `tts-router`, then uses one provider- or engine-specific worker:
+在 Qwen API 对话模式下，OumuQ 通常运行在 `http://127.0.0.1:8780`，并转发到角色 `worker_url` 指向的 `qwen-tts-api` worker，常见地址是 `http://127.0.0.1:8767`。worker 可以用 `--character-id <character_id>` 启动，并从 `voice-references/reference-index.json` 加载克隆 CosyVoice 的 `api_voice_id`、`api_clone_target_model`、`speech_language`、`visible_language`、`api_clone_language_hint`、`api_voice_instructions` 和 `send_instructions_by_default`。不要假设固定角色；必须从注册表解析用户指定的角色，并确认 OumuQ/worker 状态。
+
+这个 skill 通过 `tts-router` 路由，然后使用一个特定 provider 或 engine 的 worker：
 
 `%USERPROFILE%\.codex\skills\indextts2-audio\scripts\indextts2_worker.py`
 
@@ -29,71 +31,71 @@ This skill routes through `tts-router`, then uses one provider- or engine-specif
 
 `%USERPROFILE%\.codex\skills\qwen-tts-api\scripts\qwen_tts_api_worker.py`
 
-## Behavior
+## 行为规则
 
-- Keep ordinary replies short.
-- Every piece of ordinary user-visible Codex output must be spoken through the worker, including intermediary updates and final answers.
-- Default behavior: make the visible reply and speech text carry the same meaning. They do not need to be byte-identical when the character's speech language differs from the visible language.
-- Active character rule: select an active character from `voice-references/reference-index.json` and apply its style lightly to the visible Codex reply.
-- Technical correctness comes first. Character acting should add flavor, not hide information or make engineering instructions vague.
-- Character style must come from the active character's registry fields such as `style_summary`, `speech_language`, and `visible_language`; do not hardcode character-specific behavior in this skill.
-- Persona fidelity rule: when character dialogue is enabled, shape both the visible reply and the TTS speech text to be as close as practical to the active character's speaking style. Preserve the user's requested language and technical clarity, but choose wording, address terms, sentence rhythm, emotional tone, and level of playfulness/formality from the active character's `style_summary` and voice index examples.
-- Visible-role fidelity rule: the visible Codex reply must also be in-character. Do not write the screen text in a neutral Codex voice while only the TTS text role-plays. Technical accuracy, safety, and refusal boundaries still apply, but they should be expressed through the active character's manner instead of dropping the role.
-- Cross-language tone preservation rule: when speech and visible languages differ, translate the meaning while preserving the character's tone, relationship stance, politeness level, teasing/softness, catchphrases, and sentence rhythm as much as the visible language naturally allows. Do not flatten role-specific Japanese phrasing into generic Chinese; render it as characterful Chinese with the same intent and mood.
-- Do not merely use the character's voice as an audio filter. Treat the character entry as a performance guide: visible text, translated speech text, reference audio choice, and emotion hints should all point in the same character direction.
-- Use the character's indexed lines as style examples when available. Prefer recurring address terms, catchphrases, emotional cadence, and politeness level from nearby matching entries, while avoiding direct long quotations unless the user specifically asks for them.
-- Character switch rule: whenever the active character changes, first resolve that character's `character_folder` from `voice-references/reference-index.json`, then read that folder's `README.md` before composing the next visible reply. Treat the README as the primary style guide because it usually contains dialogue examples, usage notes, and character-specific speaking patterns.
-- If `speech_language` differs from `visible_language`, prepare speech text in the speech language while preserving the same meaning as the visible reply.
-- If Codex sends several visible messages, submit each visible message.
-- Default order: submit the speech text to the TTS worker first, confirm the worker accepted the job, then display the ordinary text to the user.
-- Do not wait for the audio to finish generating or playing unless the user asks for strict "hear first, read later".
-- This "submit first, show text second" order hides some generation delay and makes the spoken-chat experience feel faster.
-- In low-latency dialogue mode, submit with a persistent local HTTP client such as Node REPL `fetch` instead of starting a fresh PowerShell command for each message. The worker should return `202 queued` quickly while generation and playback continue in the background.
-- Prefer OumuQ `POST /api/speak` over direct worker `POST /speak`. OumuQ normalizes the canonical request, resolves character defaults, records `runs/YYYY-MM-DD/...` metadata, and forwards supported or harmless fields to the selected worker.
-- Use the current workspace as the owner of generated files and cache.
-- Let `tts-router` choose the TTS engine and reference audio from `voice-references/reference-index.json`.
-- Prefer sending the active character identity and emotion hints to `tts-router`/worker instead of hardcoding a concrete prompt audio path.
-- The worker splits text by sentence punctuation and plays generated sentence chunks in order.
-- When possible, pass emotion control to avoid overly flat or overly solemn speech.
-- Default to `emotion_mode = 'auto-vector'` with a mild `emotion_alpha` around `0.55`.
-- If the output has an obvious mood, pass an explicit 8-value `emotion_vector` instead of leaving it to speaker reference emotion only.
-- When the active model is cloud CosyVoice (`cosyvoice-v3-plus` through `Qwen-TTS-API`), treat `emotion_vector` as high-level intent. OumuQ/worker may degrade it into `instructions`, `speech_rate`, `pitch_rate`, and `volume` because CosyVoice cloned voices do not expose a native per-request emotion-vector field.
-- If the user corrects the role-play style, treat that correction as active direction for subsequent visible replies and speech text in the current dialogue mode. Prefer preserving the corrected performance intent over literal wording from earlier examples.
-- Do not start the IndexTTS2 WebUI for dialogue mode.
+- 普通回复保持简短。
+- 每一段普通、用户可见的 Codex 输出都必须通过 worker 播放，包括中间进度和最终回复。
+- 默认行为：屏幕回复和语音文本表达同一含义。当角色的语音语言和屏幕语言不同时，两者不必逐字一致。
+- 当前角色规则：从 `voice-references/reference-index.json` 选择当前角色，并把角色风格轻度应用到屏幕可见的 Codex 回复中。
+- 技术正确性优先。角色表演只能增加风格，不能隐藏信息，也不能让工程说明变模糊。
+- 角色风格必须来自当前角色注册字段，例如 `style_summary`、`speech_language` 和 `visible_language`；不要在这个 skill 中硬编码某个具体角色的行为。
+- 人格一致性规则：启用角色对话时，屏幕回复和 TTS 语音文本都要尽量贴近当前角色的说话方式。保留用户要求的语言和技术清晰度，但措辞、称呼、句子节奏、情绪语气、活泼或正式程度，应参考角色的 `style_summary` 和 voice index 示例。
+- 屏幕角色一致性规则：屏幕上的 Codex 回复也必须在角色中。不要屏幕文本是中性 Codex 口吻，而只有 TTS 文本在扮演。技术准确性、安全边界和拒绝规则仍然适用，但表达时应通过当前角色的方式说出来。
+- 跨语言语气保留规则：当语音语言和屏幕语言不同时，翻译含义时要尽量保留角色语气、关系姿态、礼貌程度、调侃/柔和感、口头禅和句子节奏。不要把有角色感的日语表达压平成普通中文助手总结；应该转写成带同样意图和情绪的角色化中文。
+- 不要只把角色声线当成音频滤镜。角色条目是表演指南：屏幕文本、翻译后的语音文本、参考音频选择和情绪提示都应该指向同一个角色方向。
+- 可用时使用角色索引台词作为风格示例。优先参考相近匹配条目中的常用称呼、口头禅、情绪节奏和礼貌程度；除非用户明确要求，不要长段直接引用。
+- 角色切换规则：每当当前角色变化，先从 `voice-references/reference-index.json` 解析该角色的 `character_folder`，再读取该文件夹的 `README.md`，然后再组织下一次屏幕回复。README 通常包含对话示例、使用说明和角色特有说话模式，应作为主要风格指南。
+- 如果 `speech_language` 与 `visible_language` 不同，语音文本使用 `speech_language`，同时保留屏幕回复的同一含义。
+- 如果 Codex 连续发送多段可见消息，每一段都要提交语音。
+- 默认顺序：先提交语音文本给 TTS worker，确认 worker 接受任务，再显示普通文本给用户。
+- 除非用户要求严格的“先听到，再看到”，否则不要等待音频生成或播放完成。
+- “先提交，后显示文本”的顺序可以隐藏一部分生成延迟，让语音聊天体验更快。
+- 低延迟对话模式中，使用持久本地 HTTP client，例如 Node REPL `fetch`，不要每条消息都启动新的 PowerShell。worker 应该很快返回 `202 queued`，生成和播放继续在后台进行。
+- 优先使用 OumuQ `POST /api/speak`，而不是直接 worker `POST /speak`。OumuQ 会规范化 canonical request，解析角色默认值，记录 `runs/YYYY-MM-DD/...` 元数据，并把支持或无害字段转发给选中的 worker。
+- 使用当前 workspace 作为生成文件和缓存的归属位置。
+- 让 `tts-router` 从 `voice-references/reference-index.json` 选择 TTS engine 和参考音频。
+- 优先把当前角色身份和情绪提示发送给 `tts-router`/worker，不要硬编码具体 prompt audio 路径。
+- worker 按句子标点切分文本，并按顺序播放生成的句子片段。
+- 可行时传入情绪控制，避免语音过平或过沉。
+- 默认使用 `emotion_mode = 'auto-vector'`，并设置温和的 `emotion_alpha`，大约 `0.55`。
+- 如果输出情绪很明显，传入明确的 8 值 `emotion_vector`，不要只依赖说话人参考音频的情绪。
+- 当当前模型是云端 CosyVoice，例如通过 `Qwen-TTS-API` 使用 `cosyvoice-v3-plus` 时，把 `emotion_vector` 当作高层意图。OumuQ/worker 可能会把它降级为 `instructions`、`speech_rate`、`pitch_rate` 和 `volume`，因为 CosyVoice 克隆声线不一定暴露原生逐请求 emotion-vector 字段。
+- 如果用户纠正角色表演风格，把纠正当作当前对话模式后续屏幕回复和语音文本的有效方向。优先保留被纠正后的表演意图，而不是照搬早期示例的字面表达。
+- 对话模式不要启动 IndexTTS2 WebUI。
 
-## Character Selection
+## 角色选择
 
-Use the voice reference registry as the character registry:
+使用语音参考注册表作为角色注册表：
 
 `voice-references/reference-index.json`
 
-If the user invokes this skill with only a character name, treat that as a request to enter dialogue mode for that character. Do not ask what to do and do not begin broad file searching. Resolve the character, ensure the worker, submit a short spoken acknowledgement, then show the visible acknowledgement.
+如果用户只用一个角色名调用这个 skill，就把它视为进入该角色对话模式的请求。不要追问要做什么，也不要开始大范围搜索。解析角色、确认 worker、提交一句简短语音确认，然后显示对应的屏幕确认。
 
-For each active character, use:
+对每个当前角色，使用：
 
-- `display_name` for the character name.
-- `display_name_zh` for Chinese character-name matching.
-- `name` for English or romanized character-name matching.
-- `id` for stable worker and registry routing.
-- `speech_language` for the TTS language.
-- `visible_language` for what the user sees.
-- `worker_url` for the HTTP worker when present.
-- OumuQ route-layer endpoints such as `/api/config`, `/api/characters`, `/api/tts-model-capabilities`, `/api/infer-parameters`, and `/api/speak` when OumuQ is running.
-- `<character_folder>/README.md` for character dialogue examples and style guidance.
-- `style_summary` for visible reply style and speech tone.
-- `matching_policy` for how strongly to follow indexed voice examples.
-- `index_file` and `fallback_prompt_audio` through `tts-router` for reference audio selection.
-- Cloud fields such as `api_voice_id`, `api_clone_target_model`, `api_clone_language_hint`, `api_voice_instructions`, and `send_instructions_by_default` only through local private configuration or worker/OumuQ routing. Do not expose real voice ids, clone URLs, or API keys in visible replies.
+- `display_name` 作为角色名。
+- `display_name_zh` 用于中文角色名匹配。
+- `name` 用于英文或罗马字角色名匹配。
+- `id` 用于稳定 worker 和注册路由。
+- `speech_language` 作为 TTS 语言。
+- `visible_language` 作为用户看到的语言。
+- `worker_url` 作为存在时的 HTTP worker 地址。
+- 当 OumuQ 运行时，使用路由层 endpoint，例如 `/api/config`、`/api/characters`、`/api/tts-model-capabilities`、`/api/infer-parameters` 和 `/api/speak`。
+- `<character_folder>/README.md` 作为角色对话示例和风格指南。
+- `style_summary` 用于屏幕回复风格和语音语气。
+- `matching_policy` 用于判断多强地遵循索引语音示例。
+- 通过 `tts-router` 使用 `index_file` 和 `fallback_prompt_audio` 选择参考音频。
+- 云端字段，例如 `api_voice_id`、`api_clone_target_model`、`api_clone_language_hint`、`api_voice_instructions` 和 `send_instructions_by_default`，只能通过本地私有配置或 worker/OumuQ 路由使用。不要在可见回复中暴露真实 voice id、clone URL 或 API key。
 
-If the user names a character, reference audio, language, or style, map that request to the closest character entry in the registry. If several entries match, prefer the one whose `display_name`, `display_name_zh`, `name`, `id`, `fallback_prompt_audio`, `style_summary`, or `style_summary_zh` matches the user wording.
+如果用户指定角色、参考音频、语言或风格，把请求映射到注册表中最接近的角色条目。如果多个条目匹配，优先选择 `display_name`、`display_name_zh`、`name`、`id`、`fallback_prompt_audio`、`style_summary` 或 `style_summary_zh` 匹配用户措辞的条目。
 
-Example: if the active character is `cloud_jp_voice`, read `voice-references/characters/cloud_jp_voice/README.md` before replying, then use its dialogue table to imitate recurring address terms, cadence, and emotional tone.
+示例：如果当前角色是 `cloud_jp_voice`，回复前读取 `voice-references/characters/cloud_jp_voice/README.md`，再用其中对话表模仿常用称呼、节奏和情绪语气。
 
-For a Qwen API character, resolve `display_name`, `speech_language`, `visible_language`, `worker_url`, `api_clone_language_hint`, and any voice identifiers from the local `voice-references/reference-index.json`. Do not hardcode a private character in this skill; submit speech text using the resolved speech language and let OumuQ/worker map provider-specific language hints.
+对于 Qwen API 角色，从本地 `voice-references/reference-index.json` 解析 `display_name`、`speech_language`、`visible_language`、`worker_url`、`api_clone_language_hint` 和任何 voice 标识。不要在这个 skill 中硬编码私有角色；用解析出的语音语言提交 speech text，让 OumuQ/worker 映射 provider-specific language hints。
 
-## Ensure Worker
+## 确认 Worker
 
-Prefer OumuQ as the route layer. Check it first:
+优先把 OumuQ 作为路由层。先检查它：
 
 ```powershell
 Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8780/api/config'
@@ -101,27 +103,27 @@ Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8780/api/characters'
 Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8780/api/tts-model-capabilities'
 ```
 
-If OumuQ is running, submit dialogue to `http://127.0.0.1:8780/api/speak`. To inspect the selected worker through OumuQ:
+如果 OumuQ 正在运行，把对话提交到 `http://127.0.0.1:8780/api/speak`。通过 OumuQ 检查选中 worker：
 
 ```powershell
 Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8780/api/worker/status?worker_url=http%3A%2F%2F127.0.0.1%3A8767'
 ```
 
-Prefer the character's `worker_url` from the registry for the worker behind OumuQ. For a Qwen API worker direct health check:
+OumuQ 后面的 worker 优先使用角色注册表里的 `worker_url`。Qwen API worker 的直接健康检查：
 
 ```powershell
 Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8767/status'
 ```
 
-Confirm `character_id`, `engine`, `model`, `voice`, `speech_language`/`language`, and worker readiness. If the worker is already running for the requested character, reuse it. If it is running for a different character, restart it with the requested `--character-id`.
+确认 `character_id`、`engine`、`model`、`voice`、`speech_language`/`language` 和 worker readiness。如果 worker 已经为请求角色运行，复用它。如果它正在为另一个角色运行，用请求的 `--character-id` 重启。
 
-Fallback IndexTTS2 health check:
+IndexTTS2 fallback 健康检查：
 
 ```powershell
 Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8765/health'
 ```
 
-If the request fails, start the hidden worker from the current workspace:
+如果请求失败，从当前 workspace 隐藏启动 worker：
 
 ```powershell
 $log = Join-Path (Get-Location) 'indextts2-worker.log'
@@ -138,13 +140,13 @@ Start-Process -FilePath 'py' -ArgumentList @(
 ) -WorkingDirectory (Get-Location).Path -RedirectStandardOutput $log -RedirectStandardError $err -WindowStyle Hidden -PassThru
 ```
 
-Use another port only if `8765` is occupied by an unrelated process.
+只有 `8765` 被无关进程占用时，才换其他端口。
 
-## Speak Ordinary Output
+## 播放普通输出
 
-For every ordinary message Codex is about to show the user, first submit the speech text to OumuQ or, as fallback, directly to the worker. Usually the speech text is exactly the same as the visible text.
+每次 Codex 准备向用户显示普通消息前，先把语音文本提交给 OumuQ；fallback 时才直接提交给 worker。通常语音文本和屏幕文本完全相同。
 
-Preferred low-latency OumuQ request shape:
+推荐的低延迟 OumuQ 请求形状：
 
 ```javascript
 await fetch("http://127.0.0.1:8780/api/speak", {
@@ -165,7 +167,7 @@ await fetch("http://127.0.0.1:8780/api/speak", {
 });
 ```
 
-Optional parameter inference before submission:
+提交前可选地推断参数：
 
 ```javascript
 const inferred = await fetch("http://127.0.0.1:8780/api/infer-parameters", {
@@ -179,9 +181,9 @@ const inferred = await fetch("http://127.0.0.1:8780/api/infer-parameters", {
 }).then((res) => res.json());
 ```
 
-Merge useful `inferred.parameters` into the `/api/speak` body only when it improves the current utterance. This endpoint does not generate audio.
+只有当 `inferred.parameters` 对当前发言有帮助时，才把它合并进 `/api/speak` body。这个 endpoint 不生成音频。
 
-Direct worker fallback request shape:
+直接 worker fallback 请求形状：
 
 ```javascript
 await fetch("http://127.0.0.1:8767/speak", {
@@ -197,9 +199,9 @@ await fetch("http://127.0.0.1:8767/speak", {
 });
 ```
 
-For Qwen API mode, OumuQ and the long-running worker can load `api_voice_instructions` from `voice-references/reference-index.json` as dialogue metadata. Respect `send_instructions_by_default`; keep `send_instructions: false` for CosyVoice cloned voices unless a specific instruction has been verified to generate audio. Apply the roleplay prompt mainly by shaping the visible text and speech text before submission.
+在 Qwen API 模式下，OumuQ 和长运行 worker 可以从 `voice-references/reference-index.json` 加载 `api_voice_instructions` 作为对话元数据。遵守 `send_instructions_by_default`；对于 CosyVoice 克隆声线，除非特定 instruction 已经验证能稳定生成音频，否则保持 `send_instructions: false`。角色扮演提示主要通过提交前塑造屏幕文本和语音文本来实现。
 
-PowerShell examples are only for manual fallback testing:
+PowerShell 示例只用于手动 fallback 测试：
 
 ```powershell
 $reply = '这里放本次 Codex 准备正常显示给用户的原文。'
@@ -207,11 +209,11 @@ $body = @{ text = $reply; play = $true } | ConvertTo-Json -Compress
 Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8765/speak' -ContentType 'application/json; charset=utf-8' -Body $body
 ```
 
-After OumuQ or the worker accepts the job, send the same `$reply` text to the user. Do this for commentary updates and final answers, not only for the final answer. Do not expose this PowerShell command to the user unless they ask how it works.
+OumuQ 或 worker 接受任务后，把同一段 `$reply` 文本发送给用户。中间进度和最终回复都要这样做，不只最终回复。除非用户询问原理，否则不要把这个 PowerShell 命令暴露给用户。
 
-## Differing Speech And Visible Languages
+## 语音语言和屏幕语言不同
 
-When the active character's `speech_language` differs from `visible_language`, keep the visible Codex reply in the visible language if that is most natural for the user, but submit a natural translation in the speech language. The two texts should feel like the same character speaking the same thought in two languages, not like a role-play voice paired with a neutral assistant summary:
+当当前角色的 `speech_language` 不同于 `visible_language` 时，如果对用户来说最自然，屏幕 Codex 回复保持 `visible_language`；但提交给 TTS 的文本要自然翻译成 `speech_language`。两段文本应该像同一个角色用两种语言说同一个意思，而不是一个角色音频配一个中性助手总结：
 
 ```powershell
 $visible_reply = '明白。之后屏幕上我继续用中文，但语音会用日语输出。'
@@ -226,28 +228,28 @@ $body = @{
 Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8780/api/speak' -ContentType 'application/json; charset=utf-8' -Body $body
 ```
 
-Then display `$visible_reply` to the user. The TTS text and visible text do not have to be byte-identical in this mode; they should carry the same meaning.
+然后向用户显示 `$visible_reply`。这种模式下，TTS 文本和屏幕文本不必逐字相同，但必须表达同一含义。
 
-The visible reply should still follow the active character's `style_summary`. Example:
+屏幕回复仍应遵循当前角色的 `style_summary`。示例：
 
 ```text
 Visible text: 用 `visible_language` 写给用户看的内容，措辞尽量贴近角色。
 Speech text: 用 `speech_language` 表达同样意思，并同样贴近角色口吻。
 ```
 
-## Emotion Vectors
+## 情绪向量
 
-IndexTTS2 emotion vectors use this official 8-value order:
+IndexTTS2 情绪向量使用官方 8 值顺序：
 
 `happy, angry, sad, afraid, disgusted, melancholic, surprised, calm`
 
-Prefer gentle values. The sum is normalized internally and very strong vectors can sound unnatural. Good chat defaults:
+优先使用温和数值。内部会归一化总和，过强向量可能听起来不自然。常用聊天默认值：
 
-- Warm/calm ordinary replies: use worker default `auto-vector`.
-- Happy test or cheerful reply: `emotion_mode = 'vector'`, `emotion_alpha = 0.65`, `emotion_vector = @(0.65,0,0,0,0,0,0.08,0.10)`.
-- Sad/soft reply: `emotion_mode = 'vector'`, `emotion_alpha = 0.65`, `emotion_vector = @(0,0,0.55,0,0,0.20,0,0.12)`.
+- 温暖/平静的普通回复：使用 worker 默认 `auto-vector`。
+- 开心测试或轻快回复：`emotion_mode = 'vector'`，`emotion_alpha = 0.65`，`emotion_vector = @(0.65,0,0,0,0,0,0.08,0.10)`。
+- 难过/柔和回复：`emotion_mode = 'vector'`，`emotion_alpha = 0.65`，`emotion_vector = @(0,0,0.55,0,0,0.20,0,0.12)`。
 
-When submitting ordinary output, include emotion fields if the mood is clear:
+提交普通输出时，如果情绪清楚，可以包含情绪字段：
 
 ```powershell
 $body = @{
@@ -260,29 +262,29 @@ $body = @{
 Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8765/speak' -ContentType 'application/json; charset=utf-8' -Body $body
 ```
 
-If the mood is not obvious, omit explicit fields and let the worker's `auto-vector` choose a mild chat emotion per sentence.
+如果情绪不明显，省略显式字段，让 worker 的 `auto-vector` 为每句选择温和聊天情绪。
 
-## Progress
+## 进度
 
-Check all jobs:
+检查全部任务：
 
 ```powershell
 Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8780/api/worker/status'
 ```
 
-Check one job:
+检查单个任务：
 
 ```powershell
 Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8780/api/worker/status/<job_id>'
 ```
 
-## File Placement
+## 文件位置
 
-OumuQ route-layer request metadata writes under the current workspace:
+OumuQ 路由层请求元数据写入当前 workspace：
 
 - Runs: `runs/YYYY-MM-DD/HHMMSS-<id>`
 
-The worker writes under the current workspace:
+worker 写入当前 workspace：
 
 - Cache: `.indextts2-audio-cache`
 - Reference conversion cache: `.indextts2-audio-cache\reference-audio`
@@ -290,4 +292,4 @@ The worker writes under the current workspace:
 - Logs: `indextts2-worker.log`, `indextts2-worker.err.log`
 - Qwen API cache/output: `.qwen-tts-api-cache`, `qwen-tts-api-output`
 
-This supports Chinese workspace paths because text and paths are passed with UTF-8 and absolute Unicode paths.
+这支持中文 workspace 路径，因为文本和路径都以 UTF-8 和绝对 Unicode 路径传递。

@@ -1,11 +1,11 @@
 ---
 name: qwen-api-tts-worker
-description: Use when running or documenting an OumuQ-compatible Qwen/DashScope cloud TTS API worker with optional cloned voices and public-safe placeholder configuration.
+description: 当需要运行或记录一个 OumuQ 兼容的 Qwen/DashScope 云端 TTS API worker 时使用。支持可选克隆声线，并使用公开安全的占位符配置。
 ---
 
 # Qwen API TTS Worker
 
-Use this public template for cloud TTS workers that expose the OumuQ worker contract:
+这个公开模板用于暴露 OumuQ worker contract 的云端 TTS worker：
 
 ```text
 GET  /health
@@ -14,25 +14,25 @@ GET  /status/<job_id>
 POST /speak
 ```
 
-## Required Runtime Pattern
+## 必需运行模式
 
-Run one long-lived worker for the active character, then submit local HTTP requests:
+为当前角色运行一个长生命周期 worker，然后提交本地 HTTP 请求：
 
 ```text
 Agent -> http://127.0.0.1:8767/speak -> worker -> cloud TTS provider
 ```
 
-`POST /speak` should return quickly with a queued job object. Generation and playback continue in the worker.
+`POST /speak` 应该快速返回一个 queued job object。生成和播放继续在 worker 内进行。
 
-## Configuration
+## 配置
 
-Use environment variables for secrets:
+密钥使用环境变量：
 
 ```powershell
 $env:DASHSCOPE_API_KEY = "..."
 ```
 
-Use local character metadata for non-secret routing:
+非密钥路由使用本地角色元数据：
 
 ```json
 {
@@ -45,20 +45,20 @@ Use local character metadata for non-secret routing:
 }
 ```
 
-## Voice Cloning
+## 声音克隆
 
-Cloud voice enrollment usually needs a provider-accessible reference-audio URL. Local files under `voice-references` are not enough unless they are uploaded to a public or signed URL.
+云端 voice enrollment 通常需要 provider 可访问的参考音频 URL。除非已经上传到公开或签名 URL，否则 `voice-references` 下的本地文件并不足够。
 
-When enrolling a cloned voice, pass the reference audio language hint when the provider supports it, for example `language_hints: ["ja"]` for Japanese or `language_hints: ["zh"]` for Chinese. During synthesis, also pass the current speech language hint on every request. A clone registered with Japanese reference audio can still sound wrong if synthesis later omits `ja` and the provider guesses the language.
+注册克隆声线时，如果 provider 支持，传入参考音频语言提示，例如日语用 `language_hints: ["ja"]`，中文用 `language_hints: ["zh"]`。合成时，每次请求也要传入当前语音文本的语言提示。即使克隆是用日语参考音频注册的，如果后续合成省略 `ja`，让 provider 猜语言，也可能导致发音错误。
 
-Do not publish:
+不要发布：
 
-- real API keys
-- real `voice_id`
-- real clone URLs
-- server IPs or bucket names
-- personal reference audio
+- 真实 API key。
+- 真实 `voice_id`。
+- 真实 clone URL。
+- 服务器 IP 或 bucket 名称。
+- 个人参考音频。
 
-## Instructions
+## 指令
 
-Some cloned voices may fail or become unstable when provider-side `instructions` are sent. Keep `send_instructions_by_default` false until the specific provider, model, and voice have been tested. Agent text should still follow the character style before submission.
+部分克隆声线在发送 provider-side `instructions` 时可能失败或不稳定。在特定 provider、model 和 voice 测试通过之前，保持 `send_instructions_by_default` 为 false。Agent 文本在提交前仍然应该遵循角色风格。
