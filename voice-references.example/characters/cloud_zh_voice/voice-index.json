@@ -2,8 +2,12 @@
   {
     "id": "neutral_cloud_example",
     "title": "neutral cloud example",
-    "zh": "你好，我会用自然一点的语气说这句话。",
+    "language": "Chinese",
+    "text": "你好，我会用自然一点的语气说这句话。",
+    "translation_zh": "你好，我会用自然一点的语气说这句话。",
     "mood": "neutral",
+    "engine_preference": ["Qwen-TTS-API"],
+    "source": "public-placeholder",
     "emotion_tags": ["warm", "clear"],
     "emotion_vector": [0.35, 0, 0, 0, 0, 0, 0.02, 0.3],
     "match_patterns": ["你好|测试|自然"],
