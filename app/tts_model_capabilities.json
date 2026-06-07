@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "default_request_policy": {
+    "upstream": "AI clients may send rich intent fields whenever available.",
+    "router": "OumuQ keeps the canonical fields, resolves character defaults, and forwards supported or harmless fields to workers.",
+    "worker": "Each worker maps, ignores, or degrades fields according to its engine/model capability."
+  },
+  "canonical_fields": {
+    "identity": ["character_id", "voice", "voice_id", "model", "worker_url"],
+    "content": ["text", "language", "visible_language", "speech_language"],
+    "playback": ["play", "format", "sample_rate"],
+    "style": ["emotion_mode", "emotion_alpha", "emotion_tags", "emotion_vector", "emotion_text", "instructions", "send_instructions"],
+    "prosody": ["volume", "speech_rate", "pitch_rate", "speed", "pitch"],
+    "reference": ["prompt_audio", "prompt_audios", "ref_text", "reference_audio_url"],
+    "routing": ["match_patterns", "character_folder"]
+  },
+  "models": {
+    "cosyvoice-v3-plus": {
+      "provider": "DashScope",
+      "engine": "Qwen-TTS-API",
+      "supports": [
+        "voice",
+        "language_hints",
+        "instruction",
+        "volume",
+        "speech_rate",
+        "pitch_rate",
+        "ssml_partial",
+        "voice_enrollment"
+      ],
+      "does_not_support": [
+        "native_emotion_vector",
+        "per_request_reference_audio_for_cloned_voice"
+      ],
+      "mapping": {
+        "character_id": "registry lookup: api_voice_id, api_clone_target_model, speech_language, api_voice_instructions",
+        "language": "language_hints",
+        "instructions": "SpeechSynthesizer instruction when send_instructions is true",
+        "emotion_vector": "degrade to instruction + speech_rate + pitch_rate + volume",
+        "emotion_tags": "degrade to instruction + speech_rate + pitch_rate + volume"
+      },
+      "notes": [
+        "Voice enrollment needs a provider-accessible audio URL.",
+        "CosyVoice enrollment samples should be 15-20 seconds; OumuQ caps max_prompt_audio_length at 20.",
+        "Use cloned voice_id for timbre; use instruction/prosody controls for emotion."
+      ]
+    },
+    "qwen3-tts-local": {
+      "provider": "Local",
+      "engine": "Qwen3-TTS",
+      "supports": [
+        "prompt_audio",
+        "prompt_audios",
+        "language",
+        "text",
+        "play"
+      ],
+      "does_not_support": [
+        "cloud_voice_enrollment"
+      ],
+      "mapping": {
+        "emotion_vector": "not guaranteed; prefer text style prompt or engine-specific controls",
+        "prompt_audio": "local voice reference"
+      }
+    },
+    "indextts2": {
+      "provider": "Local",
+      "engine": "IndexTTS2",
+      "supports": [
+        "prompt_audio",
+        "emotion_vector",
+        "language",
+        "text",
+        "play"
+      ],
+      "mapping": {
+        "emotion_vector": "native or worker-specific emotion vector when supported by the running worker",
+        "prompt_audio": "local voice reference"
+      }
+    }
+  }
+}

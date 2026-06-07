@@ -28,10 +28,11 @@ powershell -ExecutionPolicy Bypass -File .\tools\install_codex_skills.ps1 -Force
 
 脚本会把公开 skill 复制到当前用户的 Codex skills 目录。安装后重启 Codex 或打开新会话。
 
-手动安装时，把下面五个目录复制到 `%USERPROFILE%\.codex\skills` 或 `$env:CODEX_HOME\skills`：
+手动安装时，把下面这些目录复制到 `%USERPROFILE%\.codex\skills` 或 `$env:CODEX_HOME\skills`：
 
 - `character-tts-dialogue`
 - `character-dialogue-workflow`
+- `oumuq-character-creator`
 - `tts-router-workflow`
 - `qwen-api-tts-worker`
 - `qwen-voice-language-training`
@@ -42,6 +43,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\install_codex_skills.ps1 -Force
 
 - `character-tts-dialogue`：脱敏后的 Codex 对话入口 skill，要求可见文本和语音都保持同一角色语气，并在拿到 TTS worker 的 queued 后再显示文本。
 - `character-dialogue-workflow`：角色对话时先把语音提交给常驻 worker，再显示同样角色化的屏幕文字。
+- `oumuq-character-creator`：创建或更新 OumuQ 角色条目，包括 `reference-index.json`、角色 README、`voice-index.json`、云端克隆占位字段和公开安全边界。
 - `tts-router-workflow`：从 `voice-references` 路由角色、语言、worker、参考音频和云端音色字段。
 - `qwen-api-tts-worker`：Qwen/DashScope 云端 API worker 的通用配置方式，真实 `voice_id` 和克隆 URL 只放本地私有副本。
 - `qwen-voice-language-training`：规划 Qwen 云端克隆音色的参考语料语言、合成语言和跨语种口音取舍。

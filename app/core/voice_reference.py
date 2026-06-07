@@ -94,7 +94,7 @@ def parse_vector(value):
 def text_affinity(text, entry):
     haystack = text.lower()
     score = 0.0
-    for key in ("title", "ja", "zh"):
+    for key in ("title", "text", "translation_zh", "ja", "zh"):
         field = str(entry.get(key, "")).lower().strip()
         if not field:
             continue

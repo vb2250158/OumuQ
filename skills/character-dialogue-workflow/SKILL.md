@@ -17,11 +17,11 @@ If the user invokes this skill with only a character name, treat it as a request
 2. Read the character README if available.
 3. Compose the visible reply in `visible_language`, fully in the active character's manner.
 4. Compose matching speech text in `speech_language`. If the languages differ, translate the meaning rather than the wording, preserving the same intent, mood, relationship stance, and role-play tone.
-5. Submit the speech text to the selected worker with local HTTP `POST /speak`.
+5. Submit the speech text to OumuQ with local HTTP `POST /api/speak`.
 6. Treat `queued` as success and only then display the visible reply.
-7. Let the worker generate and play audio asynchronously.
+7. Let the selected worker generate and play audio asynchronously behind OumuQ.
 
-Do not start a new shell process for each ordinary utterance in dialogue mode. Keep one worker running and submit lightweight local HTTP requests.
+Do not start a new shell process for each ordinary utterance in dialogue mode. Keep OumuQ and one compatible worker running, then submit lightweight local HTTP requests. Direct worker `POST /speak` is a fallback when OumuQ is unavailable or explicitly bypassed.
 
 ## Dialogue Fidelity
 
@@ -49,7 +49,7 @@ Match user-provided names against these registry fields:
 
 Do not begin broad file searching when a registry entry already matches. If no entry matches, check whether the configured worker status exposes an active `character_id`; otherwise ask the user which local character id to use.
 
-Use the character's `worker_url` when present. If the worker is already running for the selected character, reuse it. If it is running for another character, restart or ask the user to restart according to the provider-specific worker skill.
+Use OumuQ as the route layer when it is running, usually `http://127.0.0.1:8780`. Use the character's `worker_url` when present for the worker behind OumuQ. If the worker is already running for the selected character, reuse it. If it is running for another character, restart or ask the user to restart according to the provider-specific worker skill.
 
 ## Request Shape
 
@@ -62,6 +62,23 @@ Use the character's `worker_url` when present. If the worker is already running 
 }
 ```
 
+Preferred endpoint:
+
+```http
+POST http://127.0.0.1:8780/api/speak
+```
+
+Optional preflight endpoints:
+
+```http
+GET  http://127.0.0.1:8780/api/config
+GET  http://127.0.0.1:8780/api/characters
+GET  http://127.0.0.1:8780/api/tts-model-capabilities
+POST http://127.0.0.1:8780/api/infer-parameters
+```
+
+`/api/infer-parameters` can infer high-level TTS controls before `/api/speak`; it does not generate audio.
+
 Optional fields:
 
 - `emotion_tags`
@@ -73,8 +90,11 @@ Optional fields:
 - `ref_text`
 - `instructions`
 - `send_instructions`
+- `speech_rate`
+- `pitch_rate`
+- `volume`
 
-Only set `send_instructions` when the target provider and voice have been tested with provider-side instructions.
+Only set `send_instructions` when the target provider and voice have been tested with provider-side instructions. For cloud CosyVoice cloned voices, OumuQ/worker may degrade high-level emotion intent into provider instructions and prosody fields because native per-request emotion vectors are not guaranteed.
 
 ## Public Safety
 

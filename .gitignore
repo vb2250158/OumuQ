@@ -8,6 +8,7 @@ venv/
 # Local generation output and caches
 outputs/
 runs/
+cache/
 *.log
 *.err.log
 *.wav

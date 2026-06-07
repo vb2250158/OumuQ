@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>本地 TTS 工作台</title>
+    <title>OumuQ</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
     <main class="app-shell">
       <header class="app-header">
         <div class="brand">
-          <h1>本地 TTS 工作台</h1>
+          <h1>OumuQ</h1>
           <p>角色优先的语音路由控制台</p>
         </div>
         <div class="status-strip">
@@ -25,6 +25,8 @@
           <button class="ghost-button" id="refresh">刷新</button>
         </div>
       </header>
+
+      <div class="error-banner is-hidden" id="errorBanner" role="status"></div>
 
       <section class="app-grid">
         <aside class="sidebar">
@@ -72,7 +74,9 @@
           <section class="panel">
             <div class="panel-title">
               <h2>情绪匹配</h2>
+              <button class="mini-button" id="inferParameters" type="button">推理</button>
             </div>
+            <div class="inline-status" id="inferStatus">本地启发式</div>
             <label>
               <span>标签</span>
               <input id="emotionTags" placeholder="teasing, calm" />
@@ -82,8 +86,37 @@
               <input id="emotionVector" placeholder="0.2,0,0,0,0,0,0.1,0.1" />
             </label>
             <label>
+              <span>模式</span>
+              <select id="emotionMode">
+                <option value="">自动</option>
+                <option value="tags">标签</option>
+                <option value="vector">向量</option>
+                <option value="text">文本</option>
+              </select>
+            </label>
+            <label>
+              <span>强度</span>
+              <input id="emotionAlpha" type="number" min="0" max="1" step="0.05" placeholder="0.5" />
+            </label>
+            <label>
+              <span>情绪文本</span>
+              <input id="emotionText" placeholder="bright and gentle" />
+            </label>
+            <label>
               <span>匹配规则</span>
               <input id="matchPatterns" placeholder="senpai|greeting" />
+            </label>
+            <label>
+              <span>参考文本</span>
+              <input id="refText" placeholder="Hello, senpai." />
+            </label>
+            <label>
+              <span>参考音频</span>
+              <input id="promptAudio" spellcheck="false" />
+            </label>
+            <label>
+              <span>参考音频组</span>
+              <input id="promptAudios" spellcheck="false" placeholder="a.wav, b.wav" />
             </label>
           </section>
         </aside>

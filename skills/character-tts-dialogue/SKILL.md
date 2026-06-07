@@ -9,15 +9,17 @@ Use this skill when the user wants Codex replies to be spoken and lightly role-p
 
 ## Required Audio Workflow
 
-All dialogue audio generation must use the low-latency worker workflow:
+All dialogue audio generation must use the low-latency OumuQ workflow:
 
-1. Keep one TTS worker running for the active voice.
-2. Submit each utterance through a local HTTP request to that worker, preferably with Node REPL `fetch`.
-3. Confirm the worker returns `202 queued`, then immediately show the visible reply.
-4. Let generation and playback continue asynchronously in the worker.
-5. Do not launch a fresh PowerShell/Python command for each ordinary reply unless this workflow is unavailable and the user accepts a fallback.
+1. Keep OumuQ running as the local route layer, usually `http://127.0.0.1:8780`.
+2. Keep one compatible TTS worker running for the active voice behind OumuQ.
+3. Submit each utterance through a local HTTP request to OumuQ `POST /api/speak`, preferably with Node REPL `fetch`.
+4. Confirm OumuQ returns an accepted job, usually `202 queued` or a JSON object whose `status` is `queued`, then immediately show the visible reply.
+5. Let generation and playback continue asynchronously in the worker.
+6. Only submit directly to the worker `POST /speak` when OumuQ is unavailable or the user explicitly wants to bypass the route layer.
+7. Do not launch a fresh PowerShell/Python command for each ordinary reply unless the persistent workflow is unavailable and the user accepts a fallback.
 
-For Qwen API dialogue mode, the active worker is usually `qwen-tts-api` on `http://127.0.0.1:8767`, started with `--character-id <character_id>`. It loads the cloned CosyVoice `api_voice_id`, `api_clone_target_model`, `speech_language`, `visible_language`, and `api_voice_instructions` from `voice-references/reference-index.json`. Do not assume a fixed character; resolve the user-requested character from the registry and confirm the worker status.
+For Qwen API dialogue mode, OumuQ usually runs on `http://127.0.0.1:8780` and forwards to `qwen-tts-api` on the character's `worker_url`, commonly `http://127.0.0.1:8767`. The worker may be started with `--character-id <character_id>` and loads the cloned CosyVoice `api_voice_id`, `api_clone_target_model`, `speech_language`, `visible_language`, `api_clone_language_hint`, `api_voice_instructions`, and `send_instructions_by_default` from `voice-references/reference-index.json`. Do not assume a fixed character; resolve the user-requested character from the registry and confirm OumuQ/worker status.
 
 This skill routes through `tts-router`, then uses one provider- or engine-specific worker:
 
@@ -47,6 +49,7 @@ This skill routes through `tts-router`, then uses one provider- or engine-specif
 - Do not wait for the audio to finish generating or playing unless the user asks for strict "hear first, read later".
 - This "submit first, show text second" order hides some generation delay and makes the spoken-chat experience feel faster.
 - In low-latency dialogue mode, submit with a persistent local HTTP client such as Node REPL `fetch` instead of starting a fresh PowerShell command for each message. The worker should return `202 queued` quickly while generation and playback continue in the background.
+- Prefer OumuQ `POST /api/speak` over direct worker `POST /speak`. OumuQ normalizes the canonical request, resolves character defaults, records `runs/YYYY-MM-DD/...` metadata, and forwards supported or harmless fields to the selected worker.
 - Use the current workspace as the owner of generated files and cache.
 - Let `tts-router` choose the TTS engine and reference audio from `voice-references/reference-index.json`.
 - Prefer sending the active character identity and emotion hints to `tts-router`/worker instead of hardcoding a concrete prompt audio path.
@@ -54,6 +57,7 @@ This skill routes through `tts-router`, then uses one provider- or engine-specif
 - When possible, pass emotion control to avoid overly flat or overly solemn speech.
 - Default to `emotion_mode = 'auto-vector'` with a mild `emotion_alpha` around `0.55`.
 - If the output has an obvious mood, pass an explicit 8-value `emotion_vector` instead of leaving it to speaker reference emotion only.
+- When the active model is cloud CosyVoice (`cosyvoice-v3-plus` through `Qwen-TTS-API`), treat `emotion_vector` as high-level intent. OumuQ/worker may degrade it into `instructions`, `speech_rate`, `pitch_rate`, and `volume` because CosyVoice cloned voices do not expose a native per-request emotion-vector field.
 - If the user corrects the role-play style, treat that correction as active direction for subsequent visible replies and speech text in the current dialogue mode. Prefer preserving the corrected performance intent over literal wording from earlier examples.
 - Do not start the IndexTTS2 WebUI for dialogue mode.
 
@@ -74,20 +78,36 @@ For each active character, use:
 - `speech_language` for the TTS language.
 - `visible_language` for what the user sees.
 - `worker_url` for the HTTP worker when present.
+- OumuQ route-layer endpoints such as `/api/config`, `/api/characters`, `/api/tts-model-capabilities`, `/api/infer-parameters`, and `/api/speak` when OumuQ is running.
 - `<character_folder>/README.md` for character dialogue examples and style guidance.
 - `style_summary` for visible reply style and speech tone.
 - `matching_policy` for how strongly to follow indexed voice examples.
 - `index_file` and `fallback_prompt_audio` through `tts-router` for reference audio selection.
+- Cloud fields such as `api_voice_id`, `api_clone_target_model`, `api_clone_language_hint`, `api_voice_instructions`, and `send_instructions_by_default` only through local private configuration or worker/OumuQ routing. Do not expose real voice ids, clone URLs, or API keys in visible replies.
 
 If the user names a character, reference audio, language, or style, map that request to the closest character entry in the registry. If several entries match, prefer the one whose `display_name`, `display_name_zh`, `name`, `id`, `fallback_prompt_audio`, `style_summary`, or `style_summary_zh` matches the user wording.
 
 Example: if the active character is `cloud_jp_voice`, read `voice-references/characters/cloud_jp_voice/README.md` before replying, then use its dialogue table to imitate recurring address terms, cadence, and emotional tone.
 
-For a Qwen API character, resolve `display_name`, `speech_language`, `visible_language`, `worker_url`, `api_clone_language_hint`, and any voice identifiers from the local `voice-references/reference-index.json`. Do not hardcode a private character in this skill; submit speech text using the resolved speech language and let the worker map provider-specific language hints.
+For a Qwen API character, resolve `display_name`, `speech_language`, `visible_language`, `worker_url`, `api_clone_language_hint`, and any voice identifiers from the local `voice-references/reference-index.json`. Do not hardcode a private character in this skill; submit speech text using the resolved speech language and let OumuQ/worker map provider-specific language hints.
 
 ## Ensure Worker
 
-Prefer the character's `worker_url` from the registry. For a Qwen API worker, health check:
+Prefer OumuQ as the route layer. Check it first:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8780/api/config'
+Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8780/api/characters'
+Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8780/api/tts-model-capabilities'
+```
+
+If OumuQ is running, submit dialogue to `http://127.0.0.1:8780/api/speak`. To inspect the selected worker through OumuQ:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8780/api/worker/status?worker_url=http%3A%2F%2F127.0.0.1%3A8767'
+```
+
+Prefer the character's `worker_url` from the registry for the worker behind OumuQ. For a Qwen API worker direct health check:
 
 ```powershell
 Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8767/status'
@@ -122,9 +142,46 @@ Use another port only if `8765` is occupied by an unrelated process.
 
 ## Speak Ordinary Output
 
-For every ordinary message Codex is about to show the user, first submit the speech text to the worker. Usually the speech text is exactly the same as the visible text.
+For every ordinary message Codex is about to show the user, first submit the speech text to OumuQ or, as fallback, directly to the worker. Usually the speech text is exactly the same as the visible text.
 
-Preferred low-latency request shape:
+Preferred low-latency OumuQ request shape:
+
+```javascript
+await fetch("http://127.0.0.1:8780/api/speak", {
+  method: "POST",
+  headers: { "Content-Type": "application/json; charset=utf-8" },
+  body: JSON.stringify({
+    text: speechText,
+    play: true,
+    character_id: activeCharacterId,
+    language: speechLanguage,
+    emotion_tags: emotionTags,
+    emotion_text: emotionText,
+    emotion_mode: emotionMode,
+    emotion_alpha: 0.55,
+    instructions: characterVoiceInstructions,
+    send_instructions: sendInstructions
+  })
+});
+```
+
+Optional parameter inference before submission:
+
+```javascript
+const inferred = await fetch("http://127.0.0.1:8780/api/infer-parameters", {
+  method: "POST",
+  headers: { "Content-Type": "application/json; charset=utf-8" },
+  body: JSON.stringify({
+    text: speechText,
+    character_id: activeCharacterId,
+    provider: "auto"
+  })
+}).then((res) => res.json());
+```
+
+Merge useful `inferred.parameters` into the `/api/speak` body only when it improves the current utterance. This endpoint does not generate audio.
+
+Direct worker fallback request shape:
 
 ```javascript
 await fetch("http://127.0.0.1:8767/speak", {
@@ -140,7 +197,7 @@ await fetch("http://127.0.0.1:8767/speak", {
 });
 ```
 
-For Qwen API mode, the long-running worker can load `api_voice_instructions` from `voice-references/reference-index.json` as dialogue metadata. Keep `send_instructions: false` for CosyVoice cloned voices unless a specific instruction has been verified to generate audio; apply the roleplay prompt mainly by shaping the visible text and speech text before submission.
+For Qwen API mode, OumuQ and the long-running worker can load `api_voice_instructions` from `voice-references/reference-index.json` as dialogue metadata. Respect `send_instructions_by_default`; keep `send_instructions: false` for CosyVoice cloned voices unless a specific instruction has been verified to generate audio. Apply the roleplay prompt mainly by shaping the visible text and speech text before submission.
 
 PowerShell examples are only for manual fallback testing:
 
@@ -150,7 +207,7 @@ $body = @{ text = $reply; play = $true } | ConvertTo-Json -Compress
 Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8765/speak' -ContentType 'application/json; charset=utf-8' -Body $body
 ```
 
-After the worker accepts the job, send the same `$reply` text to the user. Do this for commentary updates and final answers, not only for the final answer. Do not expose this PowerShell command to the user unless they ask how it works.
+After OumuQ or the worker accepts the job, send the same `$reply` text to the user. Do this for commentary updates and final answers, not only for the final answer. Do not expose this PowerShell command to the user unless they ask how it works.
 
 ## Differing Speech And Visible Languages
 
@@ -163,10 +220,10 @@ $body = @{
   text = $speech_text
   play = $true
   language = '<speech_language from registry>'
-  prompt_audio = '<resolved reference audio from tts-router>'
+  character_id = '<active character id>'
   max_new_tokens = 192
 } | ConvertTo-Json -Compress
-Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8765/speak' -ContentType 'application/json; charset=utf-8' -Body $body
+Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8780/api/speak' -ContentType 'application/json; charset=utf-8' -Body $body
 ```
 
 Then display `$visible_reply` to the user. The TTS text and visible text do not have to be byte-identical in this mode; they should carry the same meaning.
@@ -210,16 +267,20 @@ If the mood is not obvious, omit explicit fields and let the worker's `auto-vect
 Check all jobs:
 
 ```powershell
-Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8765/status'
+Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8780/api/worker/status'
 ```
 
 Check one job:
 
 ```powershell
-Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8765/status/<job_id>'
+Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8780/api/worker/status/<job_id>'
 ```
 
 ## File Placement
+
+OumuQ route-layer request metadata writes under the current workspace:
+
+- Runs: `runs/YYYY-MM-DD/HHMMSS-<id>`
 
 The worker writes under the current workspace:
 
@@ -227,5 +288,6 @@ The worker writes under the current workspace:
 - Reference conversion cache: `.indextts2-audio-cache\reference-audio`
 - Final outputs: `tts-worker-output`
 - Logs: `indextts2-worker.log`, `indextts2-worker.err.log`
+- Qwen API cache/output: `.qwen-tts-api-cache`, `qwen-tts-api-output`
 
 This supports Chinese workspace paths because text and paths are passed with UTF-8 and absolute Unicode paths.

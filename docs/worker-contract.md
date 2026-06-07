@@ -6,6 +6,47 @@ worker 契约采用角色优先设计。调用方最好只发送 `character_id` 
 
 worker 可以复用 `app/core/voice_reference.py` 完成角色注册表读取、正则匹配、情绪向量评分、短参考音频补长和 composite prompt WAV 创建。
 
+## 热切换
+
+热切换的高层 key 是 `character_id`。
+
+调用方切换角色时，不应重启 worker，也不应把某条声线写死为进程启动参数。正确流程是：
+
+```text
+选择 character_id -> OumuQ 解析角色注册表 -> 下一次 /speak 带 character_id 和解析参数 -> worker 按请求切声线
+```
+
+OumuQ 提供辅助接口预览当前角色会被解析到哪里：
+
+```text
+POST /api/route/resolve
+```
+
+请求：
+
+```json
+{
+  "character_id": "<character_id>"
+}
+```
+
+返回会包含：
+
+```json
+{
+  "hot_switch": true,
+  "switch_key": "character_id",
+  "route_id": "<character_id>",
+  "worker_url": "http://127.0.0.1:8767",
+  "payload": {
+    "character_id": "<character_id>",
+    "language": "Japanese"
+  }
+}
+```
+
+这个接口只解析路由，不提交语音，不触发生成。旧式“一个 worker 进程只绑定一条 prompt audio”的模式只能作为兼容 fallback。
+
 ## 必需接口
 
 ```text

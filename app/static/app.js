@@ -3,15 +3,31 @@ const state = {
   characters: [],
   config: null,
   busy: false,
+  route: null,
 };
 
 const $ = (id) => document.getElementById(id);
+
+function clearError() {
+  $("errorBanner").classList.add("is-hidden");
+  $("errorBanner").textContent = "";
+}
+
+function showError(error) {
+  const message = error?.message || String(error);
+  $("errorBanner").textContent = message;
+  $("errorBanner").classList.remove("is-hidden");
+}
 
 function splitComma(value) {
   return value
     .split(/[,\uFF0C]/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function joinList(value) {
+  return Array.isArray(value) ? value.join(", ") : value || "";
 }
 
 function parseVector(value) {
@@ -27,6 +43,27 @@ function parseVector(value) {
 function selectedCharacter() {
   const id = $("character").value;
   return state.characters.find((item) => item.id === id) || null;
+}
+
+function optionalNumber(value) {
+  if (!value.trim()) return undefined;
+  const number = Number(value);
+  if (Number.isNaN(number)) {
+    throw new Error("数值字段里包含非数字内容。");
+  }
+  return number;
+}
+
+function workerUrlForCharacter(character) {
+  if (!character) return state.config?.default_worker_url || "";
+  const engineKey = (character.tts_engine || "").toLowerCase();
+  return (
+    character.worker_url ||
+    character.resolved_worker_url ||
+    state.config?.engine_worker_urls?.[engineKey] ||
+    state.config?.default_worker_url ||
+    ""
+  );
 }
 
 function characterName(character) {
@@ -56,7 +93,13 @@ function requestBase() {
     character_id: character?.id || undefined,
     emotion_tags: splitComma($("emotionTags").value),
     emotion_vector: parseVector($("emotionVector").value),
+    emotion_mode: $("emotionMode").value || undefined,
+    emotion_alpha: optionalNumber($("emotionAlpha").value),
+    emotion_text: $("emotionText").value.trim() || undefined,
     match_patterns: splitComma($("matchPatterns").value),
+    ref_text: $("refText").value.trim() || undefined,
+    prompt_audio: $("promptAudio").value.trim() || undefined,
+    prompt_audios: splitComma($("promptAudios").value),
     max_new_tokens: Number($("maxTokens").value) || undefined,
   };
 }
@@ -116,15 +159,33 @@ function renderCharacterDetails() {
   box.append(badges, summary);
 
   $("language").value = character.speech_language || "";
+  $("workerUrl").value = workerUrlForCharacter(character);
   $("activeRoute").textContent = `${character.id} / ${character.tts_engine || "worker"} / ${
     character.speech_language || "语音语言"
   }`;
+}
+
+async function resolveHotSwitchRoute() {
+  const character = selectedCharacter();
+  if (!character) return;
+  const data = await api("/api/route/resolve", {
+    method: "POST",
+    body: JSON.stringify({ ...requestBase(), text: activeText(), character_id: character.id }),
+  });
+  state.route = data;
+  $("workerUrl").value = data.worker_url || $("workerUrl").value;
+  $("activeRoute").textContent = `热切换: ${data.route_id || character.id} -> ${data.worker_url}`;
+  setChip("routerStatus", "路由", "热切换就绪", "is-online");
+  await refreshWorkerStatus();
 }
 
 async function loadConfig() {
   state.config = await api("/api/config");
   $("workerUrl").value = state.config.default_worker_url;
   $("registryBadge").textContent = state.config.registry_exists ? "工作区" : "示例";
+  $("inferStatus").textContent = state.config.llm_inference?.configured
+    ? `LLM / ${state.config.llm_inference.model}`
+    : "本地启发式";
   setChip("routerStatus", "路由", "在线", "is-online");
 }
 
@@ -140,6 +201,7 @@ async function loadCharacters() {
   }
   $("characterCount").textContent = String(state.characters.length);
   renderCharacterDetails();
+  await resolveHotSwitchRoute();
 }
 
 function setMode(mode) {
@@ -160,6 +222,7 @@ function updateMeta() {
 async function sendText() {
   const text = $("text").value.trim();
   if (!text || state.busy) return;
+  clearError();
   setBusy(true);
   try {
     const payload = { ...requestBase(), text };
@@ -176,6 +239,7 @@ async function sendText() {
 async function sendBatch() {
   const lines = $("batchText").value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   if (!lines.length || state.busy) return;
+  clearError();
   setBusy(true);
   try {
     const payload = { ...requestBase(), lines };
@@ -197,7 +261,63 @@ function runFields(data) {
     status: response.status || "submitted",
     text: response.text || request.text || "",
     output: response.output || data.run_dir || "",
+    runDir: data.run_dir || "",
+    workerUrl: data.request?.worker_url || "",
   };
+}
+
+async function withFreshWorkerJob(data) {
+  const fields = runFields(data);
+  if (!fields.workerUrl || !fields.id || fields.id === "本地") return data;
+  if (["done", "error", "missing"].includes(fields.status)) return data;
+
+  try {
+    const workerUrl = encodeURIComponent(fields.workerUrl);
+    const job = await api(`/api/worker/status/${encodeURIComponent(fields.id)}?worker_url=${workerUrl}`);
+    if (data.worker_response) {
+      return { ...data, worker_response: { ...data.worker_response, ...job } };
+    }
+    return { ...data, response: { ...(data.response || {}), ...job } };
+  } catch {
+    return data;
+  }
+}
+
+function activeText() {
+  if (state.mode === "batch") {
+    return $("batchText").value.split(/\r?\n/).find((line) => line.trim())?.trim() || "";
+  }
+  return $("text").value.trim();
+}
+
+function applyInferredParameters(parameters) {
+  $("language").value = parameters.language || $("language").value;
+  $("emotionTags").value = joinList(parameters.emotion_tags);
+  $("emotionVector").value = joinList(parameters.emotion_vector);
+  $("emotionMode").value = parameters.emotion_mode || "";
+  $("emotionAlpha").value = parameters.emotion_alpha ?? "";
+  $("emotionText").value = parameters.emotion_text || "";
+  $("matchPatterns").value = joinList(parameters.match_patterns);
+  $("refText").value = parameters.ref_text || "";
+  $("maxTokens").value = parameters.max_new_tokens || $("maxTokens").value;
+}
+
+async function inferParameters() {
+  const text = activeText();
+  if (!text || state.busy) return;
+  clearError();
+  $("inferParameters").disabled = true;
+  try {
+    const character = selectedCharacter();
+    const data = await api("/api/infer-parameters", {
+      method: "POST",
+      body: JSON.stringify({ text, character_id: character?.id || undefined }),
+    });
+    applyInferredParameters(data.parameters || {});
+    $("inferStatus").textContent = data.source === "llm" ? "LLM 已回填" : "本地启发式已回填";
+  } finally {
+    $("inferParameters").disabled = false;
+  }
 }
 
 function prependRun(data) {
@@ -221,9 +341,13 @@ function prependRun(data) {
 
   const path = document.createElement("div");
   path.className = "run-path";
-  path.textContent = fields.output;
+  path.textContent = fields.output || fields.runDir;
 
-  card.append(top, text, path);
+  const meta = document.createElement("div");
+  meta.className = "run-meta";
+  meta.textContent = fields.workerUrl || fields.runDir;
+
+  card.append(top, text, path, meta);
   $("jobs").prepend(card);
 }
 
@@ -238,7 +362,8 @@ async function refreshRuns() {
     $("jobs").appendChild(empty);
     return;
   }
-  for (const run of data.runs) prependRun(run);
+  const runs = await Promise.all(data.runs.map((run) => withFreshWorkerJob(run)));
+  for (const run of runs) prependRun(run);
 }
 
 async function refreshWorkerStatus() {
@@ -254,22 +379,27 @@ async function refreshWorkerStatus() {
 }
 
 async function refreshAll() {
+  clearError();
   await Promise.all([refreshWorkerStatus(), refreshRuns()]);
 }
 
-$("send").addEventListener("click", () => sendText().catch((error) => alert(error.message)));
-$("sendBatch").addEventListener("click", () => sendBatch().catch((error) => alert(error.message)));
-$("refresh").addEventListener("click", () => refreshAll().catch((error) => alert(error.message)));
+$("send").addEventListener("click", () => sendText().catch(showError));
+$("sendBatch").addEventListener("click", () => sendBatch().catch(showError));
+$("refresh").addEventListener("click", () => refreshAll().catch(showError));
+$("inferParameters").addEventListener("click", () => inferParameters().catch(showError));
 $("singleMode").addEventListener("click", () => setMode("single"));
 $("batchMode").addEventListener("click", () => setMode("batch"));
-$("character").addEventListener("change", renderCharacterDetails);
+$("character").addEventListener("change", () => {
+  renderCharacterDetails();
+  resolveHotSwitchRoute().catch(showError);
+});
 $("workerUrl").addEventListener("change", () => refreshWorkerStatus());
 $("text").addEventListener("input", updateMeta);
 $("batchText").addEventListener("input", updateMeta);
 $("text").addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();
-    sendText().catch((error) => alert(error.message));
+    sendText().catch(showError);
   }
 });
 
@@ -279,7 +409,7 @@ loadConfig()
   .then(updateMeta)
   .catch((error) => {
     setChip("routerStatus", "路由", "错误", "is-offline");
-    alert(error.message);
+    showError(error);
   });
 
 setInterval(refreshWorkerStatus, 2500);

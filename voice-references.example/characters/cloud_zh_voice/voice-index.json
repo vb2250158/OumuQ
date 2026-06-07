@@ -1,0 +1,12 @@
+[
+  {
+    "id": "neutral_cloud_example",
+    "title": "neutral cloud example",
+    "zh": "你好，我会用自然一点的语气说这句话。",
+    "mood": "neutral",
+    "emotion_tags": ["warm", "clear"],
+    "emotion_vector": [0.35, 0, 0, 0, 0, 0, 0.02, 0.3],
+    "match_patterns": ["你好|测试|自然"],
+    "style_notes": "Public metadata only. Real reference audio stays in the local private copy."
+  }
+]

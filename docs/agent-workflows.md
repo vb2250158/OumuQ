@@ -82,6 +82,7 @@ Agent 绘画请求
 `skills/` 目录里放的是公开版 Agent skill 模板。它们只描述契约和操作顺序：
 
 - `character-dialogue-workflow`：每个可见回复先提交语音，再显示文字。
+- `oumuq-character-creator`：创建或更新角色条目、角色 README、`voice-index.json` 和公开安全的云端/视觉占位字段。
 - `tts-router-workflow`：从 `voice-references` 选择角色、语言、worker 和参考字段。
 - `qwen-api-tts-worker`：云端 API worker 的通用启动和脱敏配置方式。
 - `qwen-voice-language-training`：在克隆音色或跨语种说话前确认参考语料语言、目标语音语言和口音取舍。

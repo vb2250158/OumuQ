@@ -48,6 +48,18 @@ textarea {
   border-bottom: 1px solid var(--line);
 }
 
+.error-banner {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 107, 107, 0.45);
+  border-radius: 7px;
+  background: rgba(255, 107, 107, 0.12);
+  color: #ffd1d1;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .brand h1,
 .brand p,
 .panel-title h2,
@@ -78,6 +90,7 @@ textarea {
 
 .status-chip,
 .ghost-button,
+.mini-button,
 .panel-title span {
   min-height: 34px;
   border: 1px solid var(--line);
@@ -119,6 +132,18 @@ label span,
   padding: 0 12px;
   color: var(--soft);
   cursor: pointer;
+}
+
+.mini-button {
+  min-height: 28px;
+  padding: 0 9px;
+  color: var(--soft);
+  cursor: pointer;
+}
+
+.mini-button:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }
 
 .app-grid {
@@ -181,6 +206,12 @@ label {
   display: grid;
   gap: 6px;
   margin-top: 12px;
+}
+
+.inline-status {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 input,
@@ -372,6 +403,12 @@ textarea:focus {
 .run-path {
   color: var(--muted);
   font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.run-meta {
+  color: var(--muted);
   font-size: 12px;
   overflow-wrap: anywhere;
 }

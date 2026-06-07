@@ -1,0 +1,4 @@
+interface:
+  display_name: "OumuQ Character Creator"
+  short_description: "Create OumuQ voice-reference character entries."
+  default_prompt: "Use $oumuq-character-creator to create a new OumuQ character safely in voice-references."

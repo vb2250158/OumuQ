@@ -37,6 +37,7 @@ $env:CODEX_HOME\skills
 
 ```powershell
 Copy-Item -Recurse -Force .\skills\character-dialogue-workflow $HOME\.codex\skills\
+Copy-Item -Recurse -Force .\skills\oumuq-character-creator $HOME\.codex\skills\
 Copy-Item -Recurse -Force .\skills\tts-router-workflow $HOME\.codex\skills\
 Copy-Item -Recurse -Force .\skills\qwen-api-tts-worker $HOME\.codex\skills\
 Copy-Item -Recurse -Force .\skills\qwen-voice-language-training $HOME\.codex\skills\
@@ -110,6 +111,8 @@ py -X utf8 -m uvicorn tools.mock_worker:app --host 127.0.0.1 --port 8767
 进入 OumuQ 角色语音模式，角色使用 cloud_zh_voice，worker 地址 http://127.0.0.1:8767。
 之后每次回复都保持角色语气：先生成屏幕可见文本和语音文本，提交语音文本到 /speak，返回 queued 后再显示屏幕文本。
 ```
+
+如果要先创建新角色，可以使用 `oumuq-character-creator` 生成或更新 `voice-references` 角色条目，再切换到对话模式。
 
 如果需要克隆新音色或让外语参考音频改说另一种语言，再加上 `qwen-voice-language-training`。它会要求先确认目标语音语言；例如日语参考音频默认应生成日语语音，中文只作为可见回复或字幕，除非用户明确接受跨语种中文合成的口音风险。
 
