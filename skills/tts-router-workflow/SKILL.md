@@ -25,13 +25,24 @@ OumuQ 正在运行时，优先通过 OumuQ 路由，通常是 `http://127.0.0.1:
 - `IndexTTS2`：本地中文/克隆 worker。
 - `Qwen-TTS-API`：云端 API worker，通常使用 `OUMUQ_QWEN_TTS_API_WORKER_URL`。
 
+## 会话隔离与串行播放
+
+- 当前角色属于调用方会话，不属于 OumuQ 或 worker 进程。
+- 每个会话保留不透明 `session_id`，并在每次参数推理、路由解析和语音请求中发送 `session_id + character_id`。
+- `worker_url` 是共享引擎地址。不能因为另一个会话选择不同角色而重启它。
+- `status.character_id` 只能视为 legacy 启动默认值或诊断字段。
+- OumuQ 是唯一播放所有者：下游 worker 收到 `play=false`，生成可以并行，最终 WAV 按路由提交序号进入同一个 FIFO。
+- 播放顺序用 `GET /api/playback/status` 检查；任何两条 OumuQ 语音都不得叠加。
+- direct worker fallback 只有在 worker 支持逐请求解析 `character_id` 时才能共享；否则给 legacy 角色分配独立端口。
+
 ## 云端声线字段
 
 云端 API 角色可以包含：
 
 - `api_voice_id`
 - `api_clone_audio_url`
-- `api_clone_target_model`
+- `api_target_model`（规范字段）
+- `api_clone_target_model`（仅旧数据兼容）
 - `api_clone_language_hint`
 - `api_voice_instructions`
 - `send_instructions_by_default`
@@ -48,9 +59,11 @@ OumuQ 正在运行时，优先通过 OumuQ 路由，通常是 `http://127.0.0.1:
 - `POST /api/infer-parameters`：不生成音频，只推断高层请求参数。
 - `POST /api/speak`：向选中的 worker 提交一句发言。
 - `GET /api/worker/status`：通过 OumuQ 检查 worker 状态。
+- `GET /api/playback/status`：检查单进程 FIFO 与主机级播放互斥；禁止叠音，但不宣称多个 OumuQ 进程共享 FIFO 顺序。
 
 AI client 如果知道 canonical intent 字段，应发送这些字段：
 
+- correlation：`session_id`
 - identity：`character_id`、`model`、`worker_url`
 - content：`text`、`language`、`visible_language`、`speech_language`
 - style：`emotion_mode`、`emotion_alpha`、`emotion_tags`、`emotion_vector`、`emotion_text`、`instructions`、`send_instructions`

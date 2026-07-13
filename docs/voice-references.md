@@ -63,7 +63,7 @@ voice-references/
   "tts_engine": "Qwen-TTS-API",
   "api_voice_id": "<set-in-local-copy>",
   "api_clone_audio_url": "<public-or-signed-reference-audio-url>",
-  "api_clone_target_model": "cosyvoice-v3-plus",
+  "api_target_model": "cosyvoice-v3-plus",
   "api_clone_language_hint": "zh",
   "api_voice_instructions": "Use a natural conversational delivery.",
   "send_instructions_by_default": false

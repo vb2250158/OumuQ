@@ -47,6 +47,24 @@ POST /api/route/resolve
 
 这个接口只解析路由，不提交语音，不触发生成。旧式“一个 worker 进程只绑定一条 prompt audio”的模式只能作为兼容 fallback。
 
+## 多会话和串行播放
+
+OumuQ 不保存全局当前角色。调用方会话拥有 `session_id` 和 `character_id`，并在每次请求中显式发送。worker 必须把角色、音色、模型、语言、参考音频和说明解析成不可变 job 快照；不得读取“上一条请求角色”。
+
+一旦请求带有已注册的 `character_id`，该角色注册表中的云端 voice、`api_target_model` 和存在的 `character_folder` 是权威绑定。客户端残留的 voice/model/folder 不得覆盖角色身份；只有不带角色的 legacy/高级直连路径才允许这些覆盖。
+
+`session_id` 是 OumuQ 关联字段，默认不会转发给旧 worker。支持该字段的 worker 可以把它写入 job 诊断信息，但不能用它建立隐式角色绑定。
+
+启用统一播放时，OumuQ 会把下游 `play` 改为 `false`。worker 只生成最终 WAV；单一 OumuQ 进程的 FIFO 按路由层提交序号播放，实际播放持有主机级互斥锁。不同 worker 不得自行播放，因此跨引擎、跨 OumuQ 进程也不会重叠；但多个 OumuQ 进程之间不保证统一 FIFO 顺序。
+
+```text
+route sequence 1 -> worker A generate ─┐
+route sequence 2 -> worker B generate ─┼-> process FIFO + host lock -> one WAV at a time
+route sequence 3 -> worker A generate ─┘
+```
+
+worker 的 `done` 必须表示最终输出文件已经写完，可以安全打开。播放状态由 `GET /api/playback/status` 查询。
+
 ## 必需接口
 
 ```text
@@ -66,6 +84,7 @@ POST /speak
 {
   "text": "晚上好，今天辛苦了。",
   "play": true,
+  "session_id": "opaque-session-id",
   "language": "Japanese",
   "character_id": "jp_companion",
   "emotion_tags": ["cheerful", "gentle"],
@@ -99,8 +118,9 @@ worker 应尽快返回任务对象：
 
 ## 角色感知字段
 
-- `character_id`：推荐使用的高层角色选择器。
-- `character_folder`：可选，显式指定角色目录。
+- `session_id`：可选的调用方会话关联 ID；不代表角色绑定。
+- `character_id`：推荐使用的高层角色选择器，每个会话请求都应显式携带。
+- `character_folder`：无 `character_id` 的高级直连可显式指定；有已注册角色时必须由角色注册表解析，防止跨会话串用参考音频。
 - `language`：语音输出语言，通常来自角色配置。
 - `emotion_tags`：人类可读的情绪提示。
 - `emotion_vector`：数值情绪控制，也可用于参考音频匹配。
@@ -126,7 +146,7 @@ worker 应尽快返回任务对象：
   "tts_engine": "Qwen-TTS-API",
   "api_voice_id": "<set-in-local-copy>",
   "api_clone_audio_url": "<public-or-signed-reference-audio-url>",
-  "api_clone_target_model": "cosyvoice-v3-plus",
+  "api_target_model": "cosyvoice-v3-plus",
   "send_instructions_by_default": false
 }
 ```
@@ -175,6 +195,8 @@ runs/YYYY-MM-DD/HHMMSS-<id>/
 
 ## 播放规则
 
-worker 应负责顺序播放。路由层可以快速提交很多请求，但播放必须排队、串行、按提交顺序进行。
+默认由 OumuQ 统一负责播放。路由层可以快速向不同 worker 提交请求，但会把下游 `play` 改为 `false`；worker 只生成完整 WAV，OumuQ 再按提交序号进入进程内 FIFO，并持有主机级互斥锁完成播放。
+
+只有显式设置 `OUMUQ_GLOBAL_PLAYBACK=0` 的兼容模式才由 worker 自行播放。该模式只能保证单个 worker 内的顺序，无法保证跨 worker 或跨进程不叠音，不适合作为多会话默认配置。
 
 如果 worker 支持分句生成，应保证同一请求内的分句顺序稳定。

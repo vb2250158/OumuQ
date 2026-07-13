@@ -37,9 +37,11 @@ $env:CODEX_HOME\skills
 
 ```powershell
 Copy-Item -Recurse -Force .\skills\character-dialogue-workflow $HOME\.codex\skills\
-Copy-Item -Recurse -Force .\skills\oumuq-character-creator $HOME\.codex\skills\
+Copy-Item -Recurse -Force .\skills\oumuq-tts-character-creator $HOME\.codex\skills\
 Copy-Item -Recurse -Force .\skills\tts-router-workflow $HOME\.codex\skills\
 Copy-Item -Recurse -Force .\skills\qwen-api-tts-worker $HOME\.codex\skills\
+Copy-Item -Recurse -Force .\skills\qwen-tts-api $HOME\.codex\skills\
+Copy-Item -Recurse -Force .\skills\qwen-tts-audio $HOME\.codex\skills\
 Copy-Item -Recurse -Force .\skills\qwen-voice-language-training $HOME\.codex\skills\
 ```
 
@@ -100,7 +102,7 @@ http://127.0.0.1:8780
 py -X utf8 -m uvicorn tools.mock_worker:app --host 127.0.0.1 --port 8767
 ```
 
-真实云端 worker 需要另行实现或接入兼容的 `GET /health`、`GET /status`、`GET /status/<job_id>`、`POST /speak` 接口。契约见 [worker-contract.md](worker-contract.md)。
+真实云端 worker 已包含在 `qwen-tts-api` skill 中。以 `--workdir` 指向包含私有 `voice-references` 的工作区，并建议使用 `--no-play`；生成后的播放统一交给 OumuQ 的进程内 FIFO 与主机级播放互斥锁。worker 提供 `GET /health`、`GET /status`、`GET /status/<job_id>` 和 `POST /speak`，契约见 [worker-contract.md](worker-contract.md)。
 
 ## 6. 在 Codex 里启用角色语音模式
 
@@ -112,7 +114,7 @@ py -X utf8 -m uvicorn tools.mock_worker:app --host 127.0.0.1 --port 8767
 之后每次回复都保持角色语气：先生成屏幕可见文本和语音文本，提交语音文本到 /speak，返回 queued 后再显示屏幕文本。
 ```
 
-如果要先创建新角色，可以使用 `oumuq-character-creator` 生成或更新 `voice-references` 角色条目，再切换到对话模式。
+如果要先创建新角色，可以使用 `oumuq-tts-character-creator` 从中文 Wiki 或资料提取角色提示词，生成或更新 `voice-references` 角色条目，完成 TTS 试听后再切换到对话模式。完成报告会明确列出服务商、DashScope API、OumuQ 引擎、真实模型、声音设计/复刻方式、语言和验收状态；不会只写“千问版”。
 
 如果需要克隆新音色或让外语参考音频改说另一种语言，再加上 `qwen-voice-language-training`。它会要求先确认目标语音语言；例如日语参考音频默认应生成日语语音，中文只作为可见回复或字幕，除非用户明确接受跨语种中文合成的口音风险。
 
@@ -145,4 +147,9 @@ py -X utf8 -m uvicorn tools.mock_worker:app --host 127.0.0.1 --port 8767
 - 一个可跑的 OumuQ Web GUI。
 - 一个可用 mock worker 验证的 `/speak` 工作流。
 
-如果用户想用真实云端克隆音色，只需要在自己的本地副本里补 API key、`api_voice_id` 或 `api_clone_audio_url`。
+如果用户想用真正的 Qwen 云端音色，可以选择两种方式：
+
+- `qwen-voice-design + qwen3-tts-vd-*`：根据文字描述创建原创音色，不提交参考音频，适合克隆权利不明确的角色资料。
+- `qwen-voice-enrollment + qwen3-tts-vc-*`：仅用于用户明确拥有云端克隆权利的参考声音。
+
+真实 API key 与 voice ID 只保存在本机私有配置中。

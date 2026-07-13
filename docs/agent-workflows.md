@@ -53,7 +53,32 @@ Agent 生成角色化可见文本和语音文本
 }
 ```
 
-当云端克隆音色需要固定 `voice_id` 时，优先让 worker 用 `--character-id cloud_zh_voice` 从 `voice-references/reference-index.json` 读取本地配置。Agent 侧只传 `character_id`，避免把 provider 细节散落在每个调用里。
+当云端克隆音色使用固定 `voice_id` 时，让 OumuQ 和共享 worker按每次请求的 `character_id` 从 `voice-references/reference-index.json` 读取配置。`--character-id` 只作为没有请求角色时的兼容默认值。
+
+## 多会话与播放顺序
+
+每个 Agent/Codex 会话各自持有：
+
+- 一个不透明 `session_id`。
+- 该会话自己的 `active_character_id`。
+- 该角色的屏幕语言、语音语言和表演修正。
+
+这些状态不属于 OumuQ 或 worker 全局状态。每次 `/api/infer-parameters`、`/api/route/resolve` 和 `/api/speak` 都显式发送本会话的 `session_id` 与 `character_id`。不要从 `/status.character_id` 推断会话角色，也不要因为另一个会话使用不同角色而重启共享 worker。
+
+OumuQ 默认让 worker 收到 `play=false`。单一 OumuQ 进程按提交序号 FIFO 播放最终 WAV，播放前取得主机级互斥锁；会话 A、B 即使使用不同引擎或不同 OumuQ 进程，也不会同时播放。多个 OumuQ 进程之间不保证统一 FIFO 顺序。
+
+推荐请求：
+
+```json
+{
+  "session_id": "opaque-session-id",
+  "character_id": "cloud_zh_voice",
+  "text": "这里是语音文本。",
+  "play": true
+}
+```
+
+`queued` 仍表示生成请求已接受；实际播放会等待本 OumuQ 进程内更早的播放序号，并等待主机播放锁。
 
 ## 绘画模式流程
 
@@ -82,7 +107,7 @@ Agent 绘画请求
 `skills/` 目录里放的是公开版 Agent skill 模板。它们只描述契约和操作顺序：
 
 - `character-dialogue-workflow`：每个可见回复先提交语音，再显示文字。
-- `oumuq-character-creator`：创建或更新角色条目、角色 README、`voice-index.json` 和公开安全的云端/视觉占位字段。
+- `oumuq-tts-character-creator`：从中文 Wiki 或资料提取角色提示词，创建或更新角色条目，并配置、试听 TTS。
 - `tts-router-workflow`：从 `voice-references` 选择角色、语言、worker 和参考字段。
 - `qwen-api-tts-worker`：云端 API worker 的通用启动和脱敏配置方式。
 - `qwen-voice-language-training`：在克隆音色或跨语种说话前确认参考语料语言、目标语音语言和口音取舍。

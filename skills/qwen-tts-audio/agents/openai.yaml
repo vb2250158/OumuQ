@@ -1,0 +1,4 @@
+interface:
+  display_name: "Qwen TTS Audio"
+  short_description: "Generate local speech with Qwen3-TTS and prompt audio references."
+  default_prompt: "Use $qwen-tts-audio to generate and play this text with the local Qwen3-TTS worker."

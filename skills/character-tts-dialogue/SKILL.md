@@ -12,16 +12,16 @@ description: 当用户希望 Codex 聊天回复既保持选定角色风格、又
 所有对话音频生成都必须使用低延迟 OumuQ 工作流：
 
 1. 保持 OumuQ 作为本地路由层运行，通常是 `http://127.0.0.1:8780`。
-2. 保持一个兼容当前角色声线的 TTS worker 在 OumuQ 后面运行。
+2. 按引擎保持可按请求切换角色的共享 TTS worker 在 OumuQ 后面运行。
 3. 每次发言都通过本地 HTTP 请求提交给 OumuQ `POST /api/speak`，优先使用 Node REPL `fetch`。
 4. 确认 OumuQ 接受任务，通常是 `202 queued`，或返回 JSON 且 `status` 为 `queued`，然后立刻显示屏幕文本。
-5. 让 worker 在后台异步继续生成和播放。
+5. 让 worker 在后台异步生成；单一 OumuQ 进程按提交顺序 FIFO 播放，并用主机级互斥锁禁止多个进程叠音。
 6. 只有在 OumuQ 不可用，或用户明确要求绕过路由层时，才直接提交给 worker `POST /speak`。
 7. 普通回复不要每次都启动新的 PowerShell/Python 命令；除非常驻流程不可用，且用户接受 fallback。
 
 延迟规则：直接 HTTP 不是零延迟。它仍然要等待本地请求处理、OumuQ 路由、worker 排队、音频生成和播放。使用持久 runtime，例如 Node REPL `fetch` 调用 `POST http://127.0.0.1:8780/api/speak`，目的在于去掉可避免的 shell 启动开销。普通逐句语音不要把 PowerShell、`curl`、Python one-shot 或其他新 shell 进程当作常规路径。
 
-在 Qwen API 对话模式下，OumuQ 通常运行在 `http://127.0.0.1:8780`，并转发到角色 `worker_url` 指向的 `qwen-tts-api` worker，常见地址是 `http://127.0.0.1:8767`。worker 可以用 `--character-id <character_id>` 启动，并从 `voice-references/reference-index.json` 加载克隆 CosyVoice 的 `api_voice_id`、`api_clone_target_model`、`speech_language`、`visible_language`、`api_clone_language_hint`、`api_voice_instructions` 和 `send_instructions_by_default`。不要假设固定角色；必须从注册表解析用户指定的角色，并确认 OumuQ/worker 状态。
+在 Qwen API 对话模式下，OumuQ 通常运行在 `http://127.0.0.1:8780`，并转发到共享 `qwen-tts-api` worker。worker 每次根据请求 `character_id` 从注册表加载 `api_voice_id`、模型、语言提示和发声说明；`--character-id` 只是 legacy 默认值。不同会话可以交错使用不同云端角色，不需要也不允许为切角色重启共享端口。
 
 这个 skill 通过 `tts-router` 路由，然后使用一个特定 provider 或 engine 的 worker：
 
@@ -63,6 +63,18 @@ description: 当用户希望 Codex 聊天回复既保持选定角色风格、又
 - 如果用户纠正角色表演风格，把纠正当作当前对话模式后续屏幕回复和语音文本的有效方向。优先保留被纠正后的表演意图，而不是照搬早期示例的字面表达。
 - 对话模式不要启动 IndexTTS2 WebUI。
 
+## 多会话隔离与串行播放
+
+- 每个 Codex 任务/会话生成并保留自己的不透明 `session_id`。
+- `activeCharacterId` 只属于当前会话；会话 A 切换角色不能修改会话 B。
+- 每次 `/api/infer-parameters`、`/api/route/resolve` 和 `/api/speak` 都显式发送本会话的 `session_id + character_id`。
+- OumuQ 和 worker 不保存全局当前角色，也不依赖上一条请求。
+- `worker_url` 是共享服务地址，不是角色所有权。
+- OumuQ 默认把下游 worker 的 `play` 改成 `false`，让所有引擎静默生成；单进程 FIFO 按路由提交序号逐条播放最终 WAV，主机级互斥锁避免多个 OumuQ 进程叠音。
+- 后提交的音频即使更早生成完成，也必须等待前一播放序号；任何两个 OumuQ 语音都不得叠加。
+- 用 `GET /api/playback/status` 检查本 OumuQ 进程的播放序列和主机锁策略；不要把各 worker 的本地队列或多个 OumuQ 进程误当成一个跨进程全局顺序。
+- 只能绑定单角色的 legacy worker 必须使用角色专属端口；不能通过重启共享端口实现切换。
+
 ## 角色选择
 
 使用语音参考注册表作为角色注册表：
@@ -85,7 +97,7 @@ description: 当用户希望 Codex 聊天回复既保持选定角色风格、又
 - `style_summary` 用于屏幕回复风格和语音语气。
 - `matching_policy` 用于判断多强地遵循索引语音示例。
 - 通过 `tts-router` 使用 `index_file` 和 `fallback_prompt_audio` 选择参考音频。
-- 云端字段，例如 `api_voice_id`、`api_clone_target_model`、`api_clone_language_hint`、`api_voice_instructions` 和 `send_instructions_by_default`，只能通过本地私有配置或 worker/OumuQ 路由使用。不要在可见回复中暴露真实 voice id、clone URL 或 API key。
+- 云端字段，例如 `api_voice_id`、规范模型字段 `api_target_model`、`api_clone_language_hint`、`api_voice_instructions` 和 `send_instructions_by_default`，只能通过本地私有配置或 worker/OumuQ 路由使用。`api_clone_target_model` 只作旧数据兼容。不要在可见回复中暴露真实 voice id、clone URL 或 API key。
 
 如果用户指定角色、参考音频、语言或风格，把请求映射到注册表中最接近的角色条目。如果多个条目匹配，优先选择 `display_name`、`display_name_zh`、`name`、`id`、`fallback_prompt_audio`、`style_summary` 或 `style_summary_zh` 匹配用户措辞的条目。
 
@@ -115,7 +127,7 @@ OumuQ 后面的 worker 优先使用角色注册表里的 `worker_url`。Qwen API
 Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8767/status'
 ```
 
-确认 `character_id`、`engine`、`model`、`voice`、`speech_language`/`language` 和 worker readiness。如果 worker 已经为请求角色运行，复用它。如果它正在为另一个角色运行，用请求的 `--character-id` 重启。
+确认本次会话的 `session_id`、`character_id`、`engine`、`model`、`voice`、`speech_language`/`language` 和 worker readiness。status 只用于判断健康；不得从 `status.character_id` 推断会话角色，也不得因另一个会话使用不同角色而重启共享 worker。
 
 IndexTTS2 fallback 健康检查：
 
@@ -155,6 +167,7 @@ await fetch("http://127.0.0.1:8780/api/speak", {
   body: JSON.stringify({
     text: speechText,
     play: true,
+    session_id: activeSessionId,
     character_id: activeCharacterId,
     language: speechLanguage,
     emotion_tags: emotionTags,
@@ -175,6 +188,7 @@ const inferred = await fetch("http://127.0.0.1:8780/api/infer-parameters", {
   headers: { "Content-Type": "application/json; charset=utf-8" },
   body: JSON.stringify({
     text: speechText,
+    session_id: activeSessionId,
     character_id: activeCharacterId,
     provider: "auto"
   })
@@ -221,6 +235,7 @@ $speech_text = '了解しました。これから画面では中国語のまま�
 $body = @{
   text = $speech_text
   play = $true
+  session_id = '<opaque session id>'
   language = '<speech_language from registry>'
   character_id = '<active character id>'
   max_new_tokens = 192
@@ -266,7 +281,13 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8765/speak' -ContentType '
 
 ## 进度
 
-检查全部任务：
+检查本进程播放顺序与主机互斥策略：
+
+```powershell
+Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8780/api/playback/status'
+```
+
+检查 worker 全部生成任务：
 
 ```powershell
 Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8780/api/worker/status'

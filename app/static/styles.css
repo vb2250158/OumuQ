@@ -114,6 +114,24 @@ label span,
   font-size: 12px;
 }
 
+.worker-volume-hint {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(80, 194, 255, 0.35);
+  border-radius: 6px;
+  background: rgba(80, 194, 255, 0.08);
+  color: var(--soft);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.worker-volume-hint.is-offline {
+  border-color: rgba(255, 107, 107, 0.35);
+  background: rgba(255, 107, 107, 0.08);
+  color: #ffd1d1;
+}
+
 .status-chip strong {
   font-size: 13px;
   color: var(--soft);

@@ -84,7 +84,8 @@ voice-references/
 
 - `api_voice_id`：已有克隆音色 ID，本地私有副本填写。
 - `api_clone_audio_url`：公开或签名参考音频 URL，本地私有副本填写。
-- `api_clone_target_model`：云端克隆目标模型。
+- `api_target_model`：云端实际合成模型的规范字段。
+- `api_clone_target_model`：旧数据兼容别名；读取时排在 `api_target_model` 之后，新条目不要只写它。
 - `api_clone_language_hint`：克隆参考语种提示。
 - `api_voice_instructions`：自然语言发声说明。
 - `send_instructions_by_default`：是否默认把发声说明发送给 provider。
@@ -109,22 +110,22 @@ voice-references/
 `voice-index.json` 记录每条参考音频的元数据：
 
 ```json
-{
-  "entries": [
-    {
-      "id": "cheerful_001",
-      "audio_file": "voice-references/characters/my_character/audio/cheerful_001.wav",
-      "text": "示例台词",
-      "language": "Japanese",
-      "mood": "cheerful",
-      "emotion_tags": ["cheerful", "playful"],
-      "emotion_vector": [0.55, 0, 0, 0, 0, 0, 0.08, 0.15],
-      "match_patterns": ["开心|欢迎|早上好"],
-      "duration_sec": 6.2
-    }
-  ]
-}
+[
+  {
+    "id": "cheerful_001",
+    "audio_file": "voice-references/characters/my_character/audio/cheerful_001.wav",
+    "text": "示例台词",
+    "language": "Japanese",
+    "mood": ["cheerful"],
+    "emotion_tags": ["cheerful", "playful"],
+    "emotion_vector": [0.55, 0, 0, 0, 0, 0, 0.08, 0.15],
+    "match_patterns": ["开心|欢迎|早上好"],
+    "duration_seconds": 6.2
+  }
+]
 ```
+
+当前 resolver 要求 `voice-index.json` 顶层是数组；不要包在 `{ "entries": [...] }` 中。
 
 路径建议使用工作目录相对路径，避免写死个人机器路径。
 
@@ -165,22 +166,75 @@ $env:OUMUQ_ALLOWED_WORKER_HOSTS = "tts.internal.example,192.168.1.20"
 
 这只放开 host 校验；worker 仍应由可信网络或反向代理保护。
 
-## 角色热切换
+## 云端 Qwen 音色与完成报告
 
-角色热切换只依赖 `character_id`。前端选择角色或 Agent 指定角色时，OumuQ 会用 `/api/route/resolve` 解析下一次请求的 worker URL、语言、模型、参考音频和 provider 参数。
+`Qwen-TTS-API` 是 OumuQ 的兼容 worker 名，不代表实际模型。角色配置和完成报告必须分别写出：
 
-这个解析步骤不会调用 `/api/speak`，也不会启动、停止或重启任何 worker。
+- 服务商：阿里云百炼（Alibaba Cloud Model Studio）。
+- API：DashScope HTTP API。
+- 实际合成模型：例如 `qwen3-tts-vd-2026-01-26`、`qwen3-tts-vc-2026-01-22` 或 `cosyvoice-v3-plus`。
+- 音色方式：`voice_design`、`voice_cloning`、已有 voice ID 或预设音色。
 
-真正生成语音时，请求体仍然带上同一个 `character_id`：
+角色资料或参考音频的克隆授权不明确时，默认使用 `qwen-voice-design` 创建原创音色，不提交参考音频。只有用户明确拥有云端声音克隆权利时才使用 `qwen-voice-enrollment`。注册与合成模型必须完全匹配；真实 voice ID 只保存在本机私有注册表。
+
+`oumuq-tts-character-creator` 的验收报告 schema v2 会记录 provider、API、真实模型、创建方式、语言、路由、WAV 验证与“进程内 FIFO + 主机级播放互斥”策略，且只输出 `voice_id_configured` 布尔值，不显示真实 voice ID。使用 `play=false` 验收时只证明策略配置，不代表实际扬声器播放已测试。
+
+## 多会话角色隔离与热切换
+
+OumuQ 的角色路由是无状态的：没有服务器全局“当前角色”。当前角色由调用方会话拥有，每次请求都必须显式携带该会话的 `character_id`。
+
+`character_id` 使用稳定小写标识。命名角色的 `api_voice_id`、`api_target_model` 和 `character_folder` 由私有注册表绑定；旧客户端请求中残留的 voice/model/folder 会被忽略或覆盖。云端音色注册成功时，实际 enrollment/target model 必须与 voice ID 一起原子写回注册表，避免注册模型和合成模型漂移。
+
+`session_id` 是调用方生成的不透明关联 ID，只用于请求记录和界面过滤，不建立服务器端 `session_id -> character_id` 隐式绑定。带 `session_id` 的语音请求如果缺少 `character_id` 会被拒绝，避免误用其他会话或进程默认音色。
+
+两个会话可以交错提交：
 
 ```json
-{
-  "text": "こんばんは。",
-  "character_id": "<character_id>"
-}
+{"session_id":"session-a","character_id":"tifira","text":"第一句","play":true}
+{"session_id":"session-b","character_id":"bb","text":"第二句","play":true}
+{"session_id":"session-a","character_id":"tifira","text":"第三句","play":true}
 ```
 
-只要 worker 支持按请求读取 `character_id` 或解析后的参数，就可以常驻运行并热切换声线。
+A -> B -> A 的三次请求会分别重新解析角色注册表；会话 A 的角色变化不会修改会话 B。`POST /api/route/resolve` 只预览本次请求，不写入任何全局角色状态。`GET /status` 里的 `character_id` 若存在，也只能视为 worker 启动默认值或诊断字段，不能作为会话角色来源。
+
+WebGUI 为每个页面会话生成 `?session=<opaque-id>`，并在 `sessionStorage` 中按“会话 × 角色”保存表单草稿。点击“新会话”会打开带新 ID 的标签页。角色切换会保存旧角色草稿并载入新角色草稿，不会把 `prompt_audio`、`ref_text`、情绪向量或匹配规则带到另一个角色。工作进程地址只有在用户手工修改时才作为请求覆盖值发送。
+
+按会话查看记录：
+
+```text
+GET /api/runs?session_id=session-a
+GET /api/runs?session_id=session-b&character_id=bb
+```
+
+### 进程内 FIFO 与主机级播放互斥
+
+默认 `OUMUQ_GLOBAL_PLAYBACK=1`。当请求 `play=true` 时：
+
+```text
+多个会话提交
+  -> OumuQ 分配进程内播放序号
+  -> 各 worker 收到 play=false，只负责生成
+  -> OumuQ 等待每个 job 完成
+  -> 按提交序号进入本进程 FIFO
+  -> 取得主机级播放锁
+  -> Windows winsound 阻塞播放完整 WAV
+```
+
+因此不同角色即使路由到不同 worker 或不同 OumuQ 进程，也不会叠加。单一 OumuQ 进程内，后提交的语音即使先生成完成，也必须等待更早的播放序号；多个进程之间只保证互斥，不保证统一顺序。状态接口：
+
+```text
+GET /api/playback/status
+```
+
+只有调试 worker 本地播放时才可设置 `OUMUQ_GLOBAL_PLAYBACK=0`；此模式无法保证不同 worker 之间不重叠，不适合多会话对话。
+
+### Worker 共享规则
+
+- `worker_url` 是共享服务地址，不代表 worker 属于某个角色。
+- IndexTTS2 和本地 Qwen3-TTS 在每个 job 中快照参考音频和角色参数。
+- Qwen API worker 每次请求重新读取目标角色的 `api_voice_id`、模型、语言提示和说明。
+- `--character-id` 只能作为 legacy 默认值，不能覆盖本次请求。
+- 只能绑定单角色的旧 worker 必须使用角色专属端口隔离，不能反复重启共享端口。
 
 ## LLM 参数推理
 

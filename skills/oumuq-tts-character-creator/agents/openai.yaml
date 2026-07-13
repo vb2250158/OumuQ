@@ -1,0 +1,4 @@
+interface:
+  display_name: "OumuQ 中文角色提取与 TTS"
+  short_description: "从中文资料提取本地参考音频并创建克隆角色"
+  default_prompt: "使用 $oumuq-tts-character-creator 从中文资料创建 OumuQ 角色；角色 TTS/克隆任务先把参考音频提取到本机私有 voice-references，再按要求走本地或千问声音克隆。skill、代码和脱敏模板可以上传 GitHub，但真实 TTS 参考音频不得放到 GitHub、公开 URL 或公网对象存储；千问克隆优先用 Data URL 直接提交百炼 API。"

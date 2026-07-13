@@ -1,7 +1,7 @@
 interface:
   display_name: "角色 TTS 对话"
   short_description: "让 Codex 回复保持角色风格，并通过 TTS 播放。"
-  default_prompt: "使用 $character-tts-dialogue，让每段可见 Codex 输出都遵循当前角色风格，并在显示前提交给 TTS。"
+  default_prompt: "使用 $character-tts-dialogue，让每段可见 Codex 输出遵循当前会话角色，携带会话与角色 ID 提交给 OumuQ，并由进程内 FIFO 与主机级播放互斥依次播放、不叠音。"
 
 policy:
   allow_implicit_invocation: true

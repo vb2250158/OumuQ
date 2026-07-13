@@ -13,7 +13,7 @@ description: 当 Agent 回复需要在屏幕和语音里都完整保持角色时
 
 如果用户只用一个角色名调用这个 skill，就把它视为进入该角色对话模式的请求。
 
-1. 从 `voice-references/reference-index.json` 解析当前 `character_id`。
+1. 为当前 Agent 会话保留不透明 `session_id`，并从 `voice-references/reference-index.json` 解析该会话的 `character_id`。
 2. 如果角色 README 存在，先读取它。
 3. 用 `visible_language` 写屏幕可见回复，并完整保持当前角色口吻。
 4. 用 `speech_language` 写匹配的语音文本。如果两种语言不同，翻译含义而不是逐字翻译，并保留相同意图、情绪、关系姿态和角色语气。
@@ -47,9 +47,13 @@ OumuQ 是角色优先的 TTS 工作流，不是“中性助手回复 + 声音滤
 - `style_summary`
 - `style_summary_zh`
 
-当注册表条目已经匹配时，不要开始大范围文件搜索。如果没有条目匹配，检查已配置 worker 状态是否暴露当前 `character_id`；否则只问用户要使用哪个本地角色 id。
+当注册表条目已经匹配时，不要开始大范围文件搜索。如果没有条目匹配，只问用户要使用哪个本地角色 id；不能从 worker status 猜测当前会话角色。
 
-OumuQ 运行时，把它作为路由层，通常是 `http://127.0.0.1:8780`。OumuQ 后面的 worker 优先使用角色的 `worker_url`。如果 worker 已经为选中的角色运行，复用它。如果它正在为另一个角色运行，根据 provider-specific worker skill 重启，或请用户重启。
+OumuQ 运行时，把它作为路由层。`worker_url` 是共享服务地址；每次请求由 `character_id` 决定声线。健康检查只确认 readiness，绝不能因为 status 显示另一个默认角色而重启共享 worker。
+
+## 多会话与播放
+
+会话 A/B 各自持有 `session_id` 和 `character_id`，每次请求都显式发送。OumuQ 不保存全局当前角色。worker 静默生成；单一 OumuQ 进程内按提交序号 FIFO 播放，主机级互斥锁保证多个进程也不叠音。`queued` 表示生成已接受，不表示可以绕过本进程前面的播放序号或主机播放锁。
 
 ## 请求形状
 
@@ -57,6 +61,7 @@ OumuQ 运行时，把它作为路由层，通常是 `http://127.0.0.1:8780`。Ou
 {
   "text": "Speech-language text to submit to TTS.",
   "play": true,
+  "session_id": "opaque-session-id",
   "character_id": "cloud_zh_voice",
   "language": "Chinese"
 }

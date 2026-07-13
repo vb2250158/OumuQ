@@ -131,6 +131,12 @@ OumuQ 路由层
 
 项目不包含模型权重、生成音频、版权游戏音频或个人参考音频。
 
+## 多会话与播放
+
+OumuQ 支持多个 Agent、Codex 任务或 WebGUI 标签页同时选择不同角色。会话角色由调用方持有，每次请求显式发送；worker 只处理本次 job，不会记住上一会话角色。
+
+默认播放由 OumuQ 统一接管：所有 worker 静默生成，单一 OumuQ 进程内的最终 WAV 按路由提交顺序进入 FIFO；实际播放再取得主机级互斥锁。这样蒂菲拉、BB 或其他角色即使使用不同引擎或不同 OumuQ 进程，也不会同时发声。多个 OumuQ 进程之间只保证不叠音，不保证统一 FIFO 顺序。
+
 ## 功能
 
 - 基于 `voice-references/reference-index.json` 的角色选择。
@@ -140,6 +146,8 @@ OumuQ 路由层
 - 可选 `emotion_tags`、`emotion_vector`、`match_patterns`。
 - 请求日志按 `runs/YYYY-MM-DD/HHMMSS-...` 组织。
 - worker 状态轮询和最近请求列表。
+- 多会话角色隔离：每个会话显式携带 `session_id + character_id`，不会共享全局当前角色。
+- 跨 worker 串行播放：单进程内按提交顺序 FIFO，主机级互斥保证多个进程也不叠音。
 - 共用参考音频匹配模块：`app/core/voice_reference.py`。
 - 公开版 Agent skill 模板：`skills/`。
 

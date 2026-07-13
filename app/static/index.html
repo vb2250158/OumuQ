@@ -22,7 +22,16 @@
             <span>工作进程</span>
             <strong>未知</strong>
           </div>
-          <button class="ghost-button" id="refresh">刷新</button>
+          <div class="status-chip" id="playbackStatus">
+            <span>串行播放</span>
+            <strong>加载中</strong>
+          </div>
+          <div class="status-chip" id="sessionStatus">
+            <span>会话</span>
+            <strong>加载中</strong>
+          </div>
+          <button class="ghost-button" id="newSession" type="button">新会话</button>
+          <button class="ghost-button" id="refresh" type="button">刷新</button>
         </div>
       </header>
 
@@ -39,6 +48,7 @@
               <span>工作进程地址</span>
               <input id="workerUrl" spellcheck="false" />
             </label>
+            <div class="worker-volume-hint" id="workerVolumeHint">播放音量：等待工作进程状态</div>
           </section>
 
           <section class="panel">

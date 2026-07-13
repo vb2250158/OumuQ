@@ -44,7 +44,7 @@ description: 当需要规划 Qwen/DashScope 克隆声线注册、语言提示，
   "speech_language": "Japanese",
   "visible_language": "Chinese",
   "api_clone_language_hint": "ja",
-  "api_clone_target_model": "cosyvoice-v3-plus"
+  "api_target_model": "cosyvoice-v3-plus"
 }
 ```
 
