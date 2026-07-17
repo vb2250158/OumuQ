@@ -31,31 +31,6 @@
       "visible_language": "Chinese",
       "style_summary": "Warm and clear Chinese narration voice.",
       "style_summary_zh": "温和清晰的中文朗读语音。"
-    },
-    {
-      "id": "cloud_zh_voice",
-      "name": "Cloud Chinese Voice",
-      "display_name": "Cloud Chinese Voice",
-      "display_name_zh": "云端中文语音",
-      "character_folder": "voice-references/characters/cloud_zh_voice",
-      "index_file": "voice-references/characters/cloud_zh_voice/voice-index.json",
-      "tts_engine": "Qwen-TTS-API",
-      "worker_url": "http://127.0.0.1:8767",
-      "speech_language": "Chinese",
-      "visible_language": "Chinese",
-      "style_summary": "Conversational cloud TTS voice with a warm, clear delivery.",
-      "style_summary_zh": "温和清晰、适合对话的云端中文语音。",
-      "api_voice_id": "<set-in-local-copy>",
-      "api_clone_audio_url": "<public-or-signed-reference-audio-url>",
-      "api_clone_target_model": "cosyvoice-v3-plus",
-      "api_clone_language_hint": "zh",
-      "api_voice_instructions": "Use a natural conversational delivery. Keep the tone warm and clear.",
-      "send_instructions_by_default": false,
-      "visual_profile": {
-        "id": "generic_companion_visual",
-        "prompt_profile": "A public, original companion character design. Do not reference private characters, private names, copyrighted characters, or real voice owners.",
-        "safety_note": "Keep image prompts generic and original when publishing examples."
-      }
     }
   ]
 }

@@ -1,9 +1,11 @@
 ---
 name: tts-router-workflow
-description: 当 Agent 需要从 voice-references 中选择 OumuQ 兼容 TTS worker、语言、角色、参考音频、云端声线元数据或播放行为时使用。
+description: 当 Agent 需要从 voice-references 中选择 OumuQ 兼容的本地 TTS worker、语言、角色、固定声线、参考音频或播放行为时使用。
 ---
 
 # TTS 路由工作流
+
+> 当前本机只允许本地 ONNX-VITS、Qwen3-TTS 与 IndexTTS2。所有云端/API worker 路线已归档，不得选择或启动。
 
 把 `voice-references/reference-index.json` 作为唯一路由来源。
 
@@ -21,9 +23,9 @@ OumuQ 正在运行时，优先通过 OumuQ 路由，通常是 `http://127.0.0.1:
 
 建议 engine key：
 
+- `ONNX-VITS`：本地固定多说话人极速 worker，默认 `http://127.0.0.1:8764`；角色用 `onnx_vits_speaker` 绑定固定声线，不读取参考音频。
 - `Qwen3-TTS`：本地多语言 worker。
 - `IndexTTS2`：本地中文/克隆 worker。
-- `Qwen-TTS-API`：云端 API worker，通常使用 `OUMUQ_QWEN_TTS_API_WORKER_URL`。
 
 ## 会话隔离与串行播放
 
@@ -64,10 +66,10 @@ OumuQ 正在运行时，优先通过 OumuQ 路由，通常是 `http://127.0.0.1:
 AI client 如果知道 canonical intent 字段，应发送这些字段：
 
 - correlation：`session_id`
-- identity：`character_id`、`model`、`worker_url`
+- identity：`character_id`、`speaker`、`speaker_id`、`model`、`worker_url`
 - content：`text`、`language`、`visible_language`、`speech_language`
 - style：`emotion_mode`、`emotion_alpha`、`emotion_tags`、`emotion_vector`、`emotion_text`、`instructions`、`send_instructions`
-- prosody：`volume`、`speech_rate`、`pitch_rate`
+- prosody：`volume`、`speech_rate`、`pitch_rate`、`speed`
 - reference：`prompt_audio`、`prompt_audios`、`ref_text`、`reference_audio_url`
 - routing：`match_patterns`、`character_folder`
 

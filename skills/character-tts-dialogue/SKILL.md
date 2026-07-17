@@ -5,6 +5,8 @@ description: 当用户希望 Codex 聊天回复既保持选定角色风格、又
 
 # 角色 TTS 对话
 
+> 当前本机只允许本地 ONNX-VITS、Qwen3-TTS 与 IndexTTS2。所有云端/API worker 路线已归档，不得选择或启动。
+
 当用户希望 Codex 回复以当前语音角色轻度扮演，并且被朗读出来时，使用这个 skill。
 
 ## 必需音频流程
@@ -29,7 +31,7 @@ description: 当用户希望 Codex 聊天回复既保持选定角色风格、又
 
 `%USERPROFILE%\.codex\skills\qwen-tts-audio\scripts\qwen_tts_worker.py`
 
-`%USERPROFILE%\.codex\skills\qwen-tts-api\scripts\qwen_tts_api_worker.py`
+`OumuQ\app\workers\onnx_vits`（固定多说话人极速 worker，默认端口 `8764`）
 
 ## 行为规则
 

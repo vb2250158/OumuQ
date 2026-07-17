@@ -1,5 +1,8 @@
 # OumuQ
 
+> [!IMPORTANT]
+> **本项目已于 2026-07-17 结束维护，仅保留为历史归档。** 角色语音、参考音频路由、本地 TTS worker、模型查询和全局顺序播放能力已经迁移到 RabiRoute 的 RabiSpeech / RabiPC「语音消息端」。当前机器不得再以 OumuQ 作为运行入口，也不得恢复已归档的付费云端 TTS/ASR API。请使用 RabiSpeech `http://127.0.0.1:8781` 或 RabiRoute Manager `http://127.0.0.1:8790`。
+
 ![OumuQ README Banner](assets/branding/oumuq-readme-banner.png)
 
 OumuQ 是一个**角色优先的本地 TTS 路由系统**。
@@ -84,9 +87,10 @@ OumuQ 从角色出发：
 
 示例：
 
+- 追求翻译/对话首响速度、使用固定声线：ONNX-VITS
 - 日语或多语言角色：Qwen3-TTS
 - 中文克隆向角色：IndexTTS2
-- 云端克隆语音：Qwen-TTS-API 或其他 API provider
+- 所有语音均由本机 ONNX-VITS、Qwen3-TTS 或 IndexTTS2 生成；付费 API 路线已归档。
 
 GUI 和 Agent 集成只需要对接统一的路由契约，而不是写死某一个模型。
 
@@ -123,11 +127,11 @@ OumuQ 路由层
         +-- 按顺序排队播放
 ```
 
-当前优先支持：
+当前仅支持本地模型：
 
+- ONNX-VITS：固定多说话人声线、低延迟即时朗读。
 - Qwen3-TTS：日语和多语言音色克隆。
 - IndexTTS2：中文和本地克隆向语音。
-- Qwen-TTS-API：通过兼容 worker 对接云端 API 音色和已脱敏的克隆配置。
 
 项目不包含模型权重、生成音频、版权游戏音频或个人参考音频。
 
@@ -142,7 +146,7 @@ OumuQ 支持多个 Agent、Codex 任务或 WebGUI 标签页同时选择不同角
 - 基于 `voice-references/reference-index.json` 的角色选择。
 - Web GUI：输入单句并按回车播放。
 - 批量输入：粘贴多行快速入队。
-- Worker URL 选择：支持 Qwen、IndexTTS2、Qwen-TTS-API 和后续 API worker。
+- Worker URL 选择：支持本机 ONNX-VITS、Qwen3-TTS 和 IndexTTS2。
 - 可选 `emotion_tags`、`emotion_vector`、`match_patterns`。
 - 请求日志按 `runs/YYYY-MM-DD/HHMMSS-...` 组织。
 - worker 状态轮询和最近请求列表。
@@ -173,6 +177,8 @@ http://127.0.0.1:8780
 ```text
 http://127.0.0.1:8765
 ```
+
+团子式的低延迟固定声线方案使用本项目自带 ONNX-VITS worker，默认端口为 `8764`。模型权重保持在本机外部目录；配置与启动方式见 [ONNX-VITS worker](docs/onnx-vits-worker.md)。
 
 如果要把 OumuQ 的角色对话工作流安装到 Codex，运行：
 

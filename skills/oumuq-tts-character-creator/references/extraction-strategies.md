@@ -25,7 +25,9 @@
 
 - `wiki.kurobbs.com/mc/item/<id>` 是 SPA；HTTP 200、正确标题或几十字兼容提示都不代表正文提取成功。
 - 优先调用官方条目接口：`POST https://api.kurobbs.com/wiki/core/catalogue/item/getEntryDetail`，请求头 `wiki_type: 9`，表单字段 `id=<id>`。
-- 只白名单提取“基础资料、角色档案、角色语音”的文字字段；明确丢弃 `playUrl`、图片 URL、头像、创建者和其他媒体元数据。
+- 面向公开证据包或仅文字人格时，只白名单提取“基础资料、角色档案、角色语音”的文字字段，并丢弃 `playUrl`、图片 URL、头像、创建者和其他媒体元数据。
+- 用户要求角色 TTS/声音克隆时，不能因为公开证据包已丢弃 `playUrl` 就结束：在本机私有流程中重新读取 `角色语音 → audio-component → mediaTabs → mediaList`，把 `playUrl` 内容下载到角色 `audio/kurobbs_cn/`，按标题与台词匹配现有 `voice-index.json` 并写入本地 `audio_file`。私有提取记录只保存本地路径、文件哈希、格式和大小，不持久化 `playUrl`、创建者或公网媒体地址。
+- 克隆前从本地 WAV 中选择约 10 至 20 秒、单人、台词准确的片段；页面有语音记录但本地 `audio_file` 仍为零时，克隆任务判定失败，不得改用 Voice Design 冒充完成。
 - 若官方接口失败，再进入浏览器最终 DOM/XHR 回退。直接 HTML 只有“浏览器版本过低”、需要 JavaScript 等提示，或正文极短时，必须判定为不足而不是 `success`。
 
 ## 证据与推断

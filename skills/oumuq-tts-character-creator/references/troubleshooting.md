@@ -322,3 +322,59 @@
 - 正确做法：测试仅在捕获到明确的命名管道 `PermissionError` 时标记环境跳过；随后在获准的非受限环境重跑同一测试/全量套件，确认跨进程临界区确实不重叠。
 - 验证门禁：受限环境显示明确 skip 原因而非失败；非受限环境该测试必须通过，不能用 skip 代替真实跨进程验证。
 - 适用范围：Windows `multiprocessing`、命名管道、跨进程文件锁与受限测试运行器。
+
+### Windows PowerShell 5 把无 BOM 中文脚本读成乱码
+
+- 现象：迁移包中的中文 `install.ps1` 内容本身完整，但用系统 `powershell.exe` 执行时中文变成乱码，并报字符串缺少结束引号。
+- 根因：Windows PowerShell 5 对无 BOM UTF-8 脚本使用系统代码页解释；乱码字节可能改变引号附近的解析结果。PowerShell 7 的 UTF-8 默认行为不能代表目标电脑上的 Windows PowerShell 5。
+- 正确做法：需要兼容 `powershell.exe` 的中文 `.ps1` 发布文件保存为 UTF-8 with BOM，或把可执行脚本文案限制为 ASCII；打包前分别做语法解析和一次隔离安装演练。
+- 验证门禁：用 Windows PowerShell 5 的 parser/实际进程加载最终归档前的脚本，退出码必须为 0；只用编辑器、Python 或 PowerShell 7 读取成功不算通过。
+- 适用范围：Windows 私人迁移包、中文安装脚本、`.ps1` 发布物和需要兼容 Windows PowerShell 5 的自动化。
+
+### 迁移包把 Voice Design 版本当成声音克隆
+
+- 现象：迁移包保留了角色的云端 voice ID，说明却把它称作“声音克隆”；实际注册表仍是 `voice_design / qwen-voice-design / qwen3-tts-vd-*`，没有本地克隆样本。
+- 根因：打包验收只检查 voice ID 是否存在，没有核对创建方式、注册模型、合成模型和本地参考音频，导致“有云端音色”被错误等同于“已声音克隆”。
+- 正确做法：迁移前逐角色核对 `api_voice_creation_method=voice_cloning`、`api_enrollment_model=qwen-voice-enrollment`、`api_target_model=qwen3-tts-vc-*`、本地 `audio_file` 与真实 voice ID；再走正式 OumuQ 链路验证 WAV。Voice Design 旧报告单独标记 legacy，不能作为克隆证据。
+- 验证门禁：归档内对每个宣称克隆的角色断言上述字段、voice ID 和本地样本均存在，且 `tts-validation` 的实际模型与角色一致；只检查 `api_voice_id` 的测试必须失败。
+- 适用范围：私人 TTS 迁移包、Qwen Voice Design/Cloning 迁移、角色变体和完成报告。
+
+### 库街区文字提取丢弃 playUrl 后没有本地克隆样本
+
+- 现象：守岸人已提取 60 条角色语音文字，`voice-index.json` 却没有任何 `audio_file`，因此无法进行声音克隆。
+- 根因：公开安全的资料提取器故意丢弃 `playUrl`，但后续克隆流程没有进入独立的本机私有音频下载阶段。
+- 正确做法：公开证据包继续丢弃媒体 URL；角色 TTS/克隆任务则从官方接口内存中读取 `playUrl`、直接下载到本机私有 `audio/kurobbs_cn/`，按标题和台词回填索引，私有结果仍不保存公网 URL。
+- 验证门禁：接口含 N 条语音时必须下载 N 个可解码音频并匹配 N 条索引；本地路径全部存在、媒体 URL 不落盘。音频数为零时不得注册克隆或降级 Voice Design。
+- 适用范围：库街区/Kurobbs SPA、公开证据与私有音频分流、角色 Wiki 声音克隆。
+
+### 系统没有 ffprobe 时 WAV 时长被误报为零
+
+- 现象：参考 WAV 文件正常，但 `ffprobe` 不在 PATH；批量检查继续把空输出转换成 `0.00` 秒，同时打印多条命令不存在错误。
+- 根因：没有在运行前检查探针工具，也没有让失败成为终止错误。
+- 正确做法：先检测 `ffprobe`；不存在时，对标准 PCM WAV 使用 Python `wave` 按帧数和采样率计算时长，其他格式再定位项目自带 ffprobe 或明确报告未验证，不能写成零秒。
+- 验证门禁：缺少 ffprobe 的 WAV fixture 仍应得到真实正时长；非 WAV 且无可用探针时必须失败而不是返回 `0`。
+- 适用范围：参考样本选择、迁移包音频检查和 Windows 未配置 ffmpeg PATH 的环境。
+
+### Qwen 声音复刻注册成功但因参考文本 WER 过高而降级
+
+- 现象：`qwen-voice-enrollment` 返回了可用音色，HTTP 和注册流程都成功，但响应同时包含 `fallback_mode: true` 与 `fallback_reason: wer_too_high`；后续合成可能出现音色、韵律或长句表现不稳定。
+- 根因：人工填写的参考文本与音频中的真实发音不够一致，或把多条带表演停顿的角色语音拼接后仍按页面台词逐字提交；只检查 `voice_configured` 会漏掉服务端已经启用降级处理。
+- 正确做法：优先使用逐字核验且连续、干净的 10 至 20 秒单人同语言样本；无法可靠取得逐字转写时停止生产注册并继续找样本，不得删除参考文本来绕过 WER。候选音色使用独立角色 ID 注册，保留旧生产绑定，直到同测试集 A/B 听审通过。
+- 验证门禁：注册响应除了 `voice_configured=true`，还必须拒绝任何 `fallback_mode=true` 或非空 `fallback_reason`；随后至少覆盖短句、普通句、长句和代表性情绪句，逐一核对角色 ID、实际模型、WAV 解码、正时长与采样率。只有用户实际 A/B 听审确认后才允许切换生产绑定；解码通过与无 fallback 都不能替代听感确认。
+- 适用范围：Qwen3-TTS-VC、游戏角色参考音频、Wiki 台词与任何可选提交参考文本的声音复刻流程。
+
+### 云 TTS/ASR 归档后旧进程与测试仍可继续触发历史路径
+
+- 现象：配置文件已经切为本地模型，但旧云 worker 仍监听端口；或 pytest 继续收集归档目录中的云端测试和实现。
+- 根因：磁盘配置迁移不会替换已加载到内存的进程；pytest 默认递归发现也不会自动把名为 `archive` 的目录视为不可执行资料。
+- 正确做法：停止云 worker，重启本地路由层；在项目 pytest 配置中把测试范围固定到活跃 `tests/` 并排除归档目录。云端 HTTP 入口返回明确的 `410 Gone`，不能只依赖“没有 API Key”。
+- 验证门禁：云 worker 端口无监听；角色表只含本机 worker；能力表只列本地模型；云注册与公网音频上传端点返回 410；全量测试不收集归档目录。
+- 适用范围：付费 TTS/ASR 下线、worker 迁移、功能归档和本地模型强制策略。
+
+### NAS/UNC 工作区让本地 ONNX-VITS 前端依赖连续失效
+
+- 现象：在映射盘或 UNC 工作区创建虚拟环境时 `ensurepip` 报实际路径与请求路径不一致；`pkg_resources` 扫描网络目录触发 Windows I/O 错误；`pyopenjtalk` 报 NumPy dtype size changed，或 MeCab 因字典路径指向父目录而初始化失败。
+- 根因：网络工作区存在不同的路径身份；旧式包发现会递归扫描不可用的 NAS 条目；预编译 `pyopenjtalk` 扩展按 NumPy 1.x ABI 构建；OpenJTalk 需要实际包含字典文件的目录而不是下载包的上级目录。
+- 正确做法：依赖安装到项目内已忽略的独立 target 目录，不把虚拟环境或模型提交 Git；固定 `numpy>=1.24,<2`；普通话前端避免为了拼音引入会触发全局包扫描的依赖；日语前端显式传入本地 OpenJTalk 实际字典目录，运行期不自动联网下载。常驻 worker 预加载并缓存 ONNX session。
+- 验证门禁：中文、日文、英文三套前端都必须生成模型词表内的 token；worker 必须从 `queued` 到 `done`；输出 WAV 可解码、有正时长且 `play=false`；运行期无网络下载；依赖约束明确阻止 NumPy 2.x。
+- 适用范围：Windows NAS/映射盘上的本地 split-ONNX VITS、pyopenjtalk、onnxruntime 和其他含预编译扩展的 TTS 前端。

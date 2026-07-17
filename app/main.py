@@ -47,16 +47,25 @@ ALLOWED_WORKER_HOSTS = DEFAULT_ALLOWED_WORKER_HOSTS | {
     if host.strip()
 }
 ENGINE_WORKER_URLS = {
+    "onnx-vits": os.environ.get("OUMUQ_ONNX_VITS_WORKER_URL", "http://127.0.0.1:8764"),
+    "onnx_vits": os.environ.get("OUMUQ_ONNX_VITS_WORKER_URL", "http://127.0.0.1:8764"),
+    "vits-onnx": os.environ.get("OUMUQ_ONNX_VITS_WORKER_URL", "http://127.0.0.1:8764"),
     "qwen3-tts": os.environ.get("OUMUQ_QWEN3_TTS_WORKER_URL", "http://127.0.0.1:8765"),
     "qwen3_tts": os.environ.get("OUMUQ_QWEN3_TTS_WORKER_URL", "http://127.0.0.1:8765"),
     "qwen": os.environ.get("OUMUQ_QWEN3_TTS_WORKER_URL", "http://127.0.0.1:8765"),
-    "qwen-tts-api": os.environ.get("OUMUQ_QWEN_TTS_API_WORKER_URL", "http://127.0.0.1:8767"),
-    "qwen_tts_api": os.environ.get("OUMUQ_QWEN_TTS_API_WORKER_URL", "http://127.0.0.1:8767"),
-    "qwen-api": os.environ.get("OUMUQ_QWEN_TTS_API_WORKER_URL", "http://127.0.0.1:8767"),
     "indextts2": os.environ.get("OUMUQ_INDEXTTS2_WORKER_URL", "http://127.0.0.1:8766"),
     "index-tts2": os.environ.get("OUMUQ_INDEXTTS2_WORKER_URL", "http://127.0.0.1:8766"),
     "index_tts2": os.environ.get("OUMUQ_INDEXTTS2_WORKER_URL", "http://127.0.0.1:8766"),
 }
+ONNX_VITS_ENGINE_KEYS = {"onnx-vits", "onnx_vits", "vits-onnx"}
+LOCAL_TTS_ONLY = True
+
+
+def reject_archived_cloud_api() -> None:
+    if LOCAL_TTS_ONLY:
+        raise HTTPException(status_code=410, detail="Cloud TTS/ASR API support is archived; local workers only.")
+
+
 SESSION_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
 CHARACTER_ID_PATTERN = r"^[a-z0-9][a-z0-9._-]{0,127}$"
 GLOBAL_PLAYBACK_ENABLED = os.environ.get("OUMUQ_GLOBAL_PLAYBACK", "1").strip().lower() not in {"0", "false", "no", "off"}
@@ -1040,6 +1049,7 @@ def enrich_request(req: SpeakRequest | BatchRequest) -> dict[str, Any]:
     fallback_language = character.get("speech_language") if character else None
     data["language"] = requested_language or infer_language_from_text(req.text if isinstance(req, SpeakRequest) else "", fallback_language)
     if character:
+        engine_key = str(character.get("tts_engine") or "").strip().lower()
         has_api_voice = bool(character.get("api_voice_id"))
         # A named character owns its timbre and target model. Stale client
         # extras must never combine character B with character A's cloud voice.
@@ -1061,6 +1071,21 @@ def enrich_request(req: SpeakRequest | BatchRequest) -> dict[str, Any]:
             data["character_folder"] = character.get("character_folder")
         if isinstance(req, SpeakRequest) and not has_api_voice and not req.prompt_audio and not req.prompt_audios:
             data["prompt_audio"] = fallback_prompt_audio(character)
+        if engine_key in ONNX_VITS_ENGINE_KEYS:
+            # Fixed speaker identity belongs to the character registry. A stale
+            # client must not combine character B with character A's speaker id.
+            data.pop("speaker", None)
+            data.pop("speaker_id", None)
+            data.pop("model", None)
+            if character.get("onnx_vits_speaker"):
+                data["speaker"] = str(character["onnx_vits_speaker"])
+            if character.get("onnx_vits_speaker_id") is not None:
+                data["speaker_id"] = int(character["onnx_vits_speaker_id"])
+            if data.get("speed") is None and character.get("onnx_vits_speed") is not None:
+                data["speed"] = float(character["onnx_vits_speed"])
+            # Fixed-speaker VITS does not use zero-shot prompt audio.
+            data.pop("prompt_audio", None)
+            data.pop("prompt_audios", None)
     emotion_intent_to_controls(data, character)
     return {key: value for key, value in data.items() if value not in (None, [], "")}
 
@@ -1340,6 +1365,7 @@ async def characters() -> dict[str, Any]:
 
 @app.get("/api/voice-clone/requests")
 async def voice_clone_requests() -> dict[str, Any]:
+    reject_archived_cloud_api()
     requests = []
     for path in list_voice_clone_request_files():
         try:
@@ -1363,6 +1389,7 @@ async def voice_clone_requests() -> dict[str, Any]:
 
 @app.post("/api/voice-clone/upload-reference")
 async def voice_clone_upload_reference(req: VoiceCloneUploadRequest) -> dict[str, Any]:
+    reject_archived_cloud_api()
     pending, request_path = load_voice_clone_request(req.request_path, req.character_id)
     character = pending.get("character", {}) if isinstance(pending.get("character"), dict) else {}
     character_id = validated_character_id(req.character_id or str(character.get("id", "")).strip())
@@ -1447,6 +1474,7 @@ async def voice_clone_upload_reference(req: VoiceCloneUploadRequest) -> dict[str
 
 @app.post("/api/audio/upload-public")
 async def audio_upload_public(req: PublicAudioUploadRequest) -> dict[str, Any]:
+    reject_archived_cloud_api()
     audio_path = authorized_audio_path(
         str(req.audio_path),
         public_audio_upload_roots(),
@@ -1511,6 +1539,7 @@ async def audio_upload_public(req: PublicAudioUploadRequest) -> dict[str, Any]:
 
 @app.post("/api/voice-clone/enroll")
 async def voice_clone_enroll(req: VoiceCloneEnrollRequest) -> dict[str, Any]:
+    reject_archived_cloud_api()
     pending, path = load_voice_clone_request(req.request_path, req.character_id)
     character = pending.get("character", {}) if isinstance(pending.get("character"), dict) else {}
     character_id = validated_character_id(req.character_id or str(character.get("id", "")).strip())

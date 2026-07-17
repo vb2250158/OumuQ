@@ -22,6 +22,9 @@ qwen-tts-output*/
 qwen-tts-api-output*/
 tts-worker-output*/
 tts-batch-output*/
+onnx-vits-output*/
+.onnx-vits-cache*/
+.onnx-vits-deps/
 .pytest_cache/
 .ruff_cache/
 *.egg-info/

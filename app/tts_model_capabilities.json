@@ -11,8 +11,8 @@
     ],
     "identity": [
       "character_id",
-      "voice",
-      "voice_id",
+      "speaker",
+      "speaker_id",
       "model",
       "worker_url"
     ],
@@ -48,10 +48,7 @@
       "prompt_audio",
       "prompt_audios",
       "ref_text",
-      "reference_audio_url",
-      "reference_audio_path",
-      "voice_prompt",
-      "preview_text"
+      "reference_audio_path"
     ],
     "routing": [
       "match_patterns",
@@ -59,34 +56,34 @@
     ]
   },
   "models": {
-    "cosyvoice-v3-plus": {
-      "provider": "DashScope",
-      "engine": "Qwen-TTS-API",
+    "onnx-vits-split": {
+      "provider": "Local",
+      "engine": "ONNX-VITS",
       "supports": [
-        "voice",
-        "language_hints",
-        "instruction",
-        "volume",
-        "speech_rate",
-        "pitch_rate",
-        "ssml_partial",
-        "voice_enrollment"
+        "text",
+        "language",
+        "speaker",
+        "speaker_id",
+        "speed",
+        "noise_scale",
+        "play"
       ],
       "does_not_support": [
-        "native_emotion_vector",
-        "per_request_reference_audio_for_cloned_voice"
+        "zero_shot_voice_cloning",
+        "prompt_audio",
+        "emotion_vector",
+        "provider_instructions",
+        "cloud_voice_enrollment"
       ],
       "mapping": {
-        "character_id": "registry lookup: api_voice_id, api_target_model (legacy api_clone_target_model fallback), speech_language, api_voice_instructions",
-        "language": "language_hints",
-        "instructions": "SpeechSynthesizer instruction when send_instructions is true",
-        "emotion_vector": "degrade to instruction + speech_rate + pitch_rate + volume",
-        "emotion_tags": "degrade to instruction + speech_rate + pitch_rate + volume"
+        "character_id": "registry lookup: onnx_vits_speaker or onnx_vits_speaker_id",
+        "speaker": "fixed multi-speaker embedding from the local model config",
+        "speed": "inverse VITS duration scale",
+        "noise_scale": "latent acoustic variation"
       },
       "notes": [
-        "Voice enrollment needs a provider-accessible audio URL.",
-        "CosyVoice enrollment samples should be 15-20 seconds; OumuQ caps max_prompt_audio_length at 20.",
-        "Use cloned voice_id for timbre; use instruction/prosody controls for emotion."
+        "Uses cached enc_p, emb_g, dp, flow, and dec ONNX Runtime sessions.",
+        "Model weights and speaker tables are external local assets and are not redistributed by OumuQ."
       ]
     },
     "qwen3-tts-local": {
@@ -121,64 +118,6 @@
         "emotion_vector": "native or worker-specific emotion vector when supported by the running worker",
         "prompt_audio": "local voice reference"
       }
-    },
-    "qwen3-tts-vd-2026-01-26": {
-      "provider": "Alibaba Cloud Model Studio (DashScope)",
-      "engine": "Qwen-TTS-API",
-      "voice_creation_method": "voice_design",
-      "enrollment_model": "qwen-voice-design",
-      "supports": [
-        "voice",
-        "text",
-        "language_type",
-        "voice_design"
-      ],
-      "does_not_support": [
-        "provider_instructions",
-        "volume",
-        "speech_rate",
-        "pitch_rate",
-        "per_request_reference_audio"
-      ],
-      "mapping": {
-        "character_id": "registry lookup: api_voice_id, api_target_model, speech_language",
-        "language": "language_type",
-        "voice_prompt": "used only during qwen-voice-design creation",
-        "emotion_vector": "keep as high-level Agent intent; do not forward as a provider field"
-      },
-      "notes": [
-        "Voice design creates an original voice from a Chinese or English description and does not upload reference audio.",
-        "Enrollment and synthesis target models must match exactly."
-      ]
-    },
-    "qwen3-tts-vc-2026-01-22": {
-      "provider": "Alibaba Cloud Model Studio (DashScope)",
-      "engine": "Qwen-TTS-API",
-      "voice_creation_method": "voice_cloning",
-      "enrollment_model": "qwen-voice-enrollment",
-      "supports": [
-        "voice",
-        "text",
-        "language_type",
-        "voice_cloning"
-      ],
-      "does_not_support": [
-        "provider_instructions",
-        "volume",
-        "speech_rate",
-        "pitch_rate",
-        "per_request_reference_audio_after_enrollment"
-      ],
-      "mapping": {
-        "character_id": "registry lookup: api_voice_id, api_target_model, speech_language",
-        "language": "language_type",
-        "reference_audio_path": "Base64 Data URL during authorized enrollment only",
-        "emotion_vector": "keep as high-level Agent intent; do not forward as a provider field"
-      },
-      "notes": [
-        "Only use reference audio that the user explicitly has rights to submit for cloud voice cloning.",
-        "Enrollment and synthesis target models must match exactly."
-      ]
     }
   },
   "playback_policy": {

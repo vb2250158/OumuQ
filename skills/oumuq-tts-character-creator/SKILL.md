@@ -5,6 +5,10 @@ description: 从中文 Wiki、网页、本地资料、角色设定或参考音�
 
 # OumuQ 角色提取与 TTS 创建
 
+## 当前本机策略：仅本地模型
+
+本机已于 2026-07-17 归档所有付费 TTS/ASR API。后文涉及 DashScope、Qwen-TTS-API、云端音色注册、Data URL 提交或公网音频上传的流程均为历史说明，不得执行。角色注册只允许 `ONNX-VITS`（本机 8764）、`Qwen3-TTS`（本机 8765）或 `IndexTTS2`（本机 8766）；参考音频必须留在本机。
+
 根据 Wiki、网页或用户资料提炼可执行的中文角色提示词，并把可用且获准私用的参考音频提取到本机私有 `voice-references`。声音克隆必须以真实本地参考音频为输入；只有另行执行并观察到真实播放时才报告扬声器试听。
 
 ## 输入信息
@@ -146,6 +150,12 @@ py -3.10 -X utf8 scripts\prepare_bwiki_character.py --extract "<角色目录>\bw
 
 只有用户明确要求不在本机保存页面音频时才省略 `--download`，并仍保留台词、语言和来源 URL 元数据；个人非商业克隆任务默认执行本地提取。
 
+### 库街区声音克隆提取流程
+
+遇到 `wiki.kurobbs.com/mc/item/<id>` 且用户要求角色 TTS、声音还原、声音克隆或“千问版”时，普通 `extract_sources.py` 的纯文字结果不算完成。该脚本为公开安全会丢弃 `playUrl`；克隆流程必须再次读取官方条目接口的角色语音组件，在本机私有目录下载真实音频，并按标题与台词给 `voice-index.json` 补齐 `audio_file`。
+
+私有提取结果不得保存 `playUrl`、创建者或公网媒体地址，只保存本地相对路径、哈希、格式、大小、标题和台词。下载数量必须与角色语音记录数一致，全部 `audio_file` 必须存在。随后选择约 10 至 20 秒的干净中文 WAV，通过 Qwen3-TTS-VC Data URL 直接提交百炼 API。
+
 ## 中文角色提示词结构
 
 在角色 `README.md` 中至少写入：
@@ -206,6 +216,7 @@ py -3.10 -X utf8 scripts\upsert_character.py --workspace "<工作区>" --entry-f
 
 ## TTS 引擎选择
 
+- 已有固定多说话人 ONNX 声线、优先最低延迟：使用 `ONNX-VITS`，worker 通常为 `http://127.0.0.1:8764`。它不读取参考音频、不做零样本克隆，角色条目必须绑定 `onnx_vits_speaker` 或 `onnx_vits_speaker_id`。
 - 中文本地音色克隆：优先 `IndexTTS2`，worker 通常为 `http://127.0.0.1:8766`。
 - 日语或多语言本地语音：优先 `Qwen3-TTS`，worker 通常为 `http://127.0.0.1:8765`。
 - 已有云端音色或本地参考样本：使用 `Qwen-TTS-API`，worker 通常为 `http://127.0.0.1:8767`。参考音频不得公开托管时优先 Qwen3-TTS-VC，把本地音频编码成 Data URL 直接提交 API；不要选择必须提供公网 URL 的 CosyVoice 路线。
@@ -278,7 +289,29 @@ py -3.10 -X utf8 scripts\upsert_character.py --workspace "<工作区>" --entry-f
 }
 ```
 
-云端克隆样本优先使用约 10 至 20 秒、干净且单人说话的本地音频。Qwen3-TTS-VC 由受控脚本把本地文件编码为 Data URL 后直接提交，不需要公开 URL；在“参考音频不得上传公网”的边界下不要改走必须公开托管音频的 CosyVoice 路线。
+### 声音克隆参考样本门禁
+
+生产音色注册前必须满足以下条件；任一项不满足时停止注册并继续找样本，不得用“接口接受了”代替素材合格：
+
+- 使用一段连续录制、同一说话者、同一语言、同一场景的 10 至 20 秒音频。中文克隆只使用中文样本；除非用户明确要求并确认跨语言克隆，否则不得混入日语、韩语或其他语言。
+- 优先选择自然、稳定的日常对话。排除喊叫、耳语、哭腔、笑声、战斗爆发、强烈角色表演、背景音乐、音效、混响和多人重叠。
+- 默认禁止把多条台词、不同场景或不同情绪片段拼成一个克隆样本。只允许对单段连续录音做首尾静音裁剪、单声道转换、重采样和保守增益调整。
+- `api_clone_reference_text` 必须是对参考音频逐字核验的同语言转写，并在 `reference_audio_source` 记录 `continuous_recording: true`、`language`、`transcript_verified: true` 和核验方法。Wiki 台词、ASR 结果或字幕只能作为草稿，未经人工听审对齐不得提交。
+- 不能可靠取得逐字文本时，保持为候选素材并停止生产注册；不得通过删除参考文本来绕过 WER 或服务端质量检查。
+
+使用确定性检查脚本阻止明显不合格的样本：
+
+```powershell
+py -3.10 -X utf8 scripts\validate_clone_sample.py --workspace "<工作区>" --entry-file "<候选角色条目>" --expected-language zh
+```
+
+验证器只检查时长、声道、峰值、静音比例、语言元数据、连续录音声明和逐字转写声明；它不能代替人工听审。
+
+新克隆先注册为独立候选变体，例如 `<id>_qwen_candidate_<date>`，不得直接覆盖当前生产角色。服务商响应出现 `fallback_mode=true`、非空 `fallback_reason`、WER 降级或预处理警告时立即判失败。没有警告也只代表“注册候选成功”，不代表音色稳定。
+
+候选音色至少生成短句、普通句、长句和一条角色代表性情绪句，与当前版本做 A/B 听审。只有用户明确确认候选更稳定后，才把生产角色绑定切换到候选音色；WAV 可解码、模型匹配和时长正常都不能替代听感确认。
+
+Qwen3-TTS-VC 由受控脚本把本地文件编码为 Data URL 后直接提交，不需要公开 URL；在“参考音频不得上传公网”的边界下不要改走必须公开托管音频的 CosyVoice 路线。
 
 真正的阿里云千问云端音色有两种方式；它们都不是仅提供 Wiki 链接时的默认动作：
 
@@ -298,7 +331,7 @@ py -3.10 -X utf8 scripts\upsert_character.py --workspace "<工作区>" --entry-f
 
 `api_voice_prompt` 要描述年龄感、音高、明暗、质感、节奏、力度、情绪范围和应避免的风格，不写“模仿某声优/某角色原声”。`api_voice_preview_text` 使用原创短句。
 
-2. 用户说明个人非商业用途并要求千问声音克隆时，使用 `qwen-voice-enrollment`；把本地样本以 Data URL 直接提交给阿里云百炼，不先上传到 GitHub、公开对象存储或公网 URL。注册与合成必须使用完全相同的 Qwen3-TTS-VC 模型：
+2. 用户说明个人非商业用途并要求千问声音克隆时，先通过声音克隆参考样本门禁，再使用 `qwen-voice-enrollment`；把本地样本以 Data URL 直接提交给阿里云百炼，不先上传到 GitHub、公开对象存储或公网 URL。注册与合成必须使用完全相同的 Qwen3-TTS-VC 模型：
 
 ```json
 {
@@ -321,8 +354,8 @@ Qwen3-TTS-VC 支持把本地个人非商业参考 WAV 作为 Base64 Data URL 提
 本节不是 package-only 的默认步骤。只有用户已明确选择 TTS 音色路线并明确要求 TTS 验证时才执行；否则跳过本节，不提交请求、不生成 WAV。
 
 1. 检查角色条目、worker URL、语言和音频路径。
-2. 选择不含剧透、隐私和长篇版权台词的原创短句。
-3. 先提交一条中性语气，再按需要测试一条代表性情绪语句。
+2. 选择不含剧透、隐私和长篇版权台词的原创测试集，至少包含短句、普通句、长句和角色代表性情绪句。
+3. 克隆候选与当前生产版本使用完全相同的测试集生成 A/B 样本；用户未实际听审确认时，只标记为“候选音色”。
 4. 记录服务商、API、OumuQ 引擎、真实模型、音色方式、角色 ID、语言和输出位置；不要把验证输出放入参考音频库。
 5. worker 或模型不可用时，保留配置并明确说明未完成 WAV/播放验证，不自动下载安装大型模型。
 
@@ -332,7 +365,7 @@ Qwen3-TTS-VC 支持把本地个人非商业参考 WAV 作为 Base64 Data URL 提
 py -3.10 -X utf8 scripts\verify_tts.py --character-id <id> --text "<原创短句>" --timeout 300 --report "<角色目录>\tts-validation.json"
 ```
 
-只有报告达到 `character_visible → route_ready → tts_queued → tts_completed → tts_verified`，且输出 WAV 可解码、有正时长，才可宣称“WAV 已验证”。只有额外的 `play=true` 请求具备可观察播放证据并记录 `playback_audio_tested=true`，才可宣称“实际播放已验证”。
+只有报告达到 `character_visible → route_ready → tts_queued → tts_completed → tts_verified`，且输出 WAV 可解码、有正时长，才可宣称“WAV 已验证”。这不等于“音色稳定”或“克隆通过”；克隆生产切换还需要同测试集 A/B 人工听审确认。只有额外的 `play=true` 请求具备可观察播放证据并记录 `playback_audio_tested=true`，才可宣称“实际播放已验证”。
 
 验收脚本生成的 `creation` 字段是最终完成报告的事实来源；可见回复不得自行猜测服务商、模型或克隆方式。
 
